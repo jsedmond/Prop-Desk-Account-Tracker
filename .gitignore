@@ -1,0 +1,8 @@
+node_modules/
+dist/
+artifacts/
+prop-desk-backup-*.json
+.env
+.env.*
+!.env.example
+*.local
