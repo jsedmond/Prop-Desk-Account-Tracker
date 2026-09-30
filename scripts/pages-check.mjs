@@ -144,7 +144,7 @@ try {
   await expect(result(tile(page, 'funded-1'), 'loss')).toContainText('$800');
   current = await record(page, 'funded-1', 'loss', today);
   assert.equal(account(current, 'funded-1').stage, 'funded_failed');
-  assert.equal(account(current, 'funded-1').balance, 50000);
+  assert.equal(account(current, 'funded-1').balance, 49900);
   assert.equal(summarize(current).withdrawn, 3000);
   await expect(tile(page, 'funded-1')).toHaveCount(0);
   await archived(page);

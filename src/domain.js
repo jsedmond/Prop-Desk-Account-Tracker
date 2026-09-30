@@ -1,4 +1,4 @@
-export const VERSION = 6;
+export const VERSION = 7;
 // Keep the existing storage key so saved workspaces are migrated in place.
 export const STORAGE_KEY = 'prop-desk.v1';
 export const DEFAULT_SETTINGS = Object.freeze({
@@ -12,8 +12,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   fundedMainWin: 4000,
   initialFundedRisk: 1000,
   postPayoutSecondRisk: 800,
-  qualifyingWin: 200,
-  qualifyingLoss: 200,
+  qualifyingWin: 175,
+  qualifyingLoss: 175,
   qualifyingWins: 4,
   payoutAmount: 3000,
 });
@@ -547,9 +547,23 @@ function migrateVersionFive(state) {
     evaluationCostCents: settings.evaluationCostCents === 9020 ? DEFAULT_SETTINGS.evaluationCostCents : settings.evaluationCostCents,
   });
   return {
-    ...state, version: VERSION, settings: migrateSettings(state.settings), accounts: migrateAccounts(state.accounts),
+    ...state, version: 6, settings: migrateSettings(state.settings), accounts: migrateAccounts(state.accounts),
     undoStack: Array.isArray(state.undoStack) ? state.undoStack.map(snapshot => snapshot && ({
       ...snapshot, settings: migrateSettings(snapshot.settings), accounts: migrateAccounts(snapshot.accounts),
+    })) : state.undoStack,
+  };
+}
+
+function migrateVersionSix(state) {
+  const migrateSettings = settings => settings && ({
+    ...settings,
+    qualifyingWin: settings.qualifyingWin === 200 ? DEFAULT_SETTINGS.qualifyingWin : settings.qualifyingWin,
+    qualifyingLoss: settings.qualifyingLoss === 200 ? DEFAULT_SETTINGS.qualifyingLoss : settings.qualifyingLoss,
+  });
+  return {
+    ...state, version: VERSION, settings: migrateSettings(state.settings),
+    undoStack: Array.isArray(state.undoStack) ? state.undoStack.map(snapshot => snapshot && ({
+      ...snapshot, settings: migrateSettings(snapshot.settings),
     })) : state.undoStack,
   };
 }
@@ -563,7 +577,8 @@ export function parseBackup(text) {
   if (state?.version === 3) state = migrateVersionThree(state);
   if (state?.version === 4) state = migrateVersionFour(state);
   if (state?.version === 5) state = migrateVersionFive(state);
-  if (!state || state.version !== VERSION) throw new Error('Unsupported backup version. Expected version 1, 2, 3, 4, 5, or 6.');
+  if (state?.version === 6) state = migrateVersionSix(state);
+  if (!state || state.version !== VERSION) throw new Error('Unsupported backup version. Expected version 1, 2, 3, 4, 5, 6, or 7.');
   const settings = validateSettings(state.settings);
   validateAccounts(state.accounts, settings, state.selectedId);
   if (!Array.isArray(state.events) || !Array.isArray(state.undoStack)) throw new Error('Invalid backup history.');

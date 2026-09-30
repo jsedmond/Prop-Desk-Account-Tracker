@@ -95,7 +95,7 @@ try {
 
   current = await record(page, panel(page), 'Trade date', 'win', anchor);
   assert.deepEqual(funded(current).qualifyingDates, [anchor]);
-  assert.equal(funded(current).balance, 54200);
+  assert.equal(funded(current).balance, 54175);
   await expect(result(panel(page), 'win')).toBeDisabled();
   await expect(result(panel(page), 'loss')).toBeEnabled();
   const sameDayWin = structuredClone(current);

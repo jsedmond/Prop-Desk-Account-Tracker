@@ -92,9 +92,9 @@ test('first or second main trade win moves into qualifying phase', () => {
   assert.equal(get(second).stage, STAGES.QUALIFYING);
 });
 
-test('four separate qualifying wins reaches payout ready at $54,800', () => {
+test('four separate qualifying wins reaches payout ready at $54,700', () => {
   const state = readyState();
-  assert.equal(get(state).balance, 54800);
+  assert.equal(get(state).balance, 54700);
   assert.equal(get(state).qualifyingDates.length, 4);
   assert.equal(get(state).stage, STAGES.PAYOUT);
   assert.equal(state.events.filter(event => event.type === 'qualifying_day').length, 4);
@@ -118,9 +118,9 @@ test('qualifying wins cannot count twice on one date, but losses remain recordab
   assert.throws(() => trade(main, 'funded-1', 'win', '2026-02-30'), /valid trade date/);
 });
 
-test('$3,000 payout leaves $51,800 and restarts the cycle', () => {
+test('$3,000 payout leaves $51,700 and restarts the cycle', () => {
   const state = act(readyState(), { type: 'payout', accountId: 'funded-1' });
-  assert.equal(get(state).balance, 51800);
+  assert.equal(get(state).balance, 51700);
   assert.equal(get(state).cycle, 2);
   assert.equal(get(state).stage, STAGES.MAIN);
   assert.equal(get(state).mainAttempts, 0);
@@ -134,10 +134,10 @@ test('post-payout first risk is $1,000 and second risk is $800; second loss fail
   const paid = act(readyState(), { type: 'payout', accountId: 'funded-1' });
   assert.equal(tradeTerms(get(paid)).loss, 1000);
   const first = trade(paid, 'funded-1', 'loss');
-  assert.equal(get(first).balance, 50800);
+  assert.equal(get(first).balance, 50700);
   assert.equal(tradeTerms(get(first)).loss, 800);
   const failed = trade(first, 'funded-1', 'loss');
-  assert.equal(get(failed).balance, 50000);
+  assert.equal(get(failed).balance, 49900);
   assert.equal(get(failed).stage, STAGES.FUNDED_FAILED);
 });
 
@@ -145,10 +145,10 @@ test('post-payout second trade win enters qualifying and later payouts repeat', 
   let state = act(readyState(), { type: 'payout', accountId: 'funded-1' });
   state = trade(state, 'funded-1', 'loss');
   state = trade(state, 'funded-1', 'win', '2026-09-25');
-  assert.equal(get(state).balance, 54800);
+  assert.equal(get(state).balance, 54700);
   for (const date of ['2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28']) state = trade(state, 'funded-1', 'win', date);
   state = act(state, { type: 'payout', accountId: 'funded-1' });
-  assert.equal(get(state).balance, 52600);
+  assert.equal(get(state).balance, 52400);
   assert.equal(get(state).cycle, 3);
   assert.equal(summarize(state).withdrawn, 6000);
 });
@@ -202,7 +202,7 @@ test('settings change untouched active and waiting evaluations and future funded
   assert.deepEqual(act(updated, { type: 'undo' }).settings, initial.settings);
   const paid = act(act(readyState(), { type: 'settings', settings: { ...DEFAULT_SETTINGS, fundedMainWin: 5000 } }), { type: 'payout', accountId: 'funded-1' });
   assert.equal(get(paid).rules.fundedMainWin, 5000);
-  assert.equal(get(paid).balance, 51800);
+  assert.equal(get(paid).balance, 51700);
 });
 
 test('settings refresh an untraded active evaluation baseline without changing identity, costs or history', () => {
@@ -298,7 +298,7 @@ test('changing evaluation starting balance never changes an existing funded bala
   assert.equal(get(state, 'eval-2').startingBalance, 60000);
   state = readyState(state);
   state = act(state, { type: 'payout', accountId: 'funded-1' });
-  assert.equal(get(state).balance, 51800);
+  assert.equal(get(state).balance, 51700);
   assert.equal(get(state).startingBalance, 50000);
   assert.deepEqual(parseBackup(exportBackup(state)), state);
 });
@@ -646,7 +646,7 @@ test('funded continuation closes preserve second-attempt risk and failure rules'
   state = open(state, ['funded-1', 'eval-2']);
   assert.equal(get(state).openTrade.loss, 800);
   state = close(state, 'funded-1', 'loss');
-  assert.equal(get(state).balance, 50000);
+  assert.equal(get(state).balance, 49900);
   assert.equal(get(state).stage, STAGES.FUNDED_FAILED);
   assert.ok(get(state, 'eval-2').openTrade);
   assert.equal(canOpenContinuation(get(state)), false);
@@ -1286,7 +1286,7 @@ test('failed funded accounts archive while retaining payouts, costs, history and
   const failed = record(firstLoss, 'funded-1', 'loss');
   assert.equal(isArchived(get(failed)), true);
   assert.equal(get(failed).stage, STAGES.FUNDED_FAILED);
-  assert.equal(get(failed).balance, 50000);
+  assert.equal(get(failed).balance, 49900);
   assert.equal(get(failed).mainAttempts, 2);
   assert.equal(isArchived(get(failed, 'eval-1')), true);
   assert.deepEqual(get(failed, 'eval-1'), get(paid, 'eval-1'));
@@ -1464,7 +1464,7 @@ test('migration preserves existing earlier qualifying days and payout milestones
   assert.deepEqual(get(migrated).qualifyingDates, ['2026-09-25']);
   assert.deepEqual(migrated.events, legacy.events);
   assert.throws(() => record(migrated, 'funded-1', 'loss', '2026-09-28'), /before the main profit win/);
-  assert.equal(get(record(migrated, 'funded-1', 'loss')).balance, get(migrated).balance - 200);
+  assert.equal(get(record(migrated, 'funded-1', 'loss')).balance, get(migrated).balance - 175);
   const readyLegacy = JSON.parse(versionFourBackup(readyState()));
   readyLegacy.events.find(event => event.type === 'trade' && event.accountId === 'funded-1' && event.stage === STAGES.MAIN).date = '2026-09-29';
   const readyMigrated = parseBackup(JSON.stringify(readyLegacy));

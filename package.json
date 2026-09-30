@@ -14,7 +14,8 @@
     "test:qualifying-date": "node scripts/qualifying-date-check.mjs",
     "test:pages": "node scripts/pages-check.mjs",
     "test:account-names": "node scripts/account-names-check.mjs",
-    "test:settings": "node scripts/settings-check.mjs"
+    "test:settings": "node scripts/settings-check.mjs",
+    "test:defaults": "node scripts/default-settings-check.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

@@ -37,8 +37,8 @@ The hosted tracker still stores accounts only in your browser. GitHub receives t
 - Evaluation wins add $1,500; losses subtract $1,000. Pass at $53,000 or higher. The initial failure level is $48,000, trailing $2,000 below the highest closed balance and capped at the original $50,000 starting balance. It rises with new highs and never falls after losses. A balance at or below the current failure level fails the evaluation.
 - Passing creates a $50,000 funded account and activates the next waiting evaluation. Funded accounts can be selected independently from the active evaluation.
 - In the first funded cycle, either of two main trade attempts can win $4,000. Each loss risks $1,000. Two main losses fail the account.
-- Qualifying wins add $200 and count one qualifying day. Qualifying results must be dated on or after that cycle's main-profit win; same-day results are allowed. Only one qualifying win per selected calendar date counts in a cycle. A $200 loss preserves completed days. The same date can be reused in a later cycle if it meets that cycle's main-win date cutoff.
-- Four qualifying days enable a $3,000 payout. The ideal first cycle leaves $51,800 after the withdrawal.
+- Qualifying wins add $175 and count one qualifying day. Qualifying results must be dated on or after that cycle's main-profit win; same-day results are allowed. Only one qualifying win per selected calendar date counts in a cycle. A $175 loss preserves completed days. The same date can be reused in a later cycle if it meets that cycle's main-win date cutoff.
+- Four qualifying days enable a $3,000 payout. The ideal first cycle leaves $51,700 after the withdrawal.
 - Later cycles risk $1,000 on the first main loss and $800 on the second. Two losses fail the account; a win enters qualifying days again.
 - There is no additional automatic failure threshold during qualifying days because the requested rules do not define one.
 
@@ -64,13 +64,15 @@ Every amount, the evaluation failure level, starting account count, and qualifyi
 
 ## History and undo
 
+**Restore default settings**, next to **Reset all data** in Settings, immediately restores every setting to the application defaults and discards unsaved setting edits. It uses the same rule-update behavior as saving settings, preserves accounts, names, recorded trades, costs, payouts and progress, and can be undone. **Reset all data** is separate and remains destructive.
+
 Each action is an atomic state transition. Trades record the timestamp, selected trade date, account, account type, cycle, stage, result, P&L, and before/after balances. Milestones and payouts are recorded separately.
 
 Undo restores the complete prior account state, selection, rules, queue, cycle, and payout totals. Original events stay in the audit trail and are marked **Undone** through an appended reversal event. Reversed events are excluded from metrics. Undo survives reload and JSON backup restoration. Reset clears history and cannot be undone; reset and import both require confirmation.
 
 ## Backup format
 
-JSON schema version `6` contains `settings`, `accounts`, `selectedId`, `events`, and `undoStack`. Each account has a `customName` string, empty when using its default label. Each evaluation carries its purchase price in `purchaseCostCents`, queue role in `evaluationRole`, and highest closed balance in `evaluationHighWater`. Funded accounts store their current cycle's `mainWinDate`, or `null` in the main phase. Each account stores an `openTrade` snapshot or `null`. Existing versions `1` through `5` automatically migrate, preserving trades, costs, payouts, and undo snapshots. Saved settings matching the old defaults (ten starting evaluations and $90.20 per purchase) update to five and $90 for future purchases and resets; other configured counts and prices remain unchanged. Existing accounts are not removed and their purchase costs and rule snapshots are retained. Undo snapshots receive the same default-settings update. High-water marks and main-win dates are reconstructed from the relevant unreversed trade history for both current accounts and undo snapshots; old milestones and stages are not retroactively rewritten. For incomplete legacy histories, a known qualifying date supplies the cutoff; if no date can be recovered, the account remains loadable but qualifying results are blocked until a valid main-win date is available. Version `1` purchases retain their original $90.20 cost. The original browser storage key is retained. Imports are validated before replacing the workspace and limited to 10 MB. Unsupported versions are rejected instead of being guessed; future migration steps belong in `parseBackup` in `src/domain.js`. Damaged saved data is preserved and trading is disabled until importing a valid backup or resetting.
+JSON schema version `7` contains `settings`, `accounts`, `selectedId`, `events`, and `undoStack`. Each account has a `customName` string, empty when using its default label. Each evaluation carries its purchase price in `purchaseCostCents`, queue role in `evaluationRole`, and highest closed balance in `evaluationHighWater`. Funded accounts store their current cycle's `mainWinDate`, or `null` in the main phase. Each account stores an `openTrade` snapshot or `null`. Existing versions `1` through `6` automatically migrate, preserving trades, costs, payouts, and undo snapshots. Saved settings matching the old defaults (ten starting evaluations and $90.20 per purchase) update to five and $90 for future purchases and resets; other configured counts and prices remain unchanged. Version `6` settings with $200 qualifying wins or losses update to $175; other configured qualifying amounts remain unchanged. Existing accounts are not removed and their purchase costs and rule snapshots are retained. Undo snapshots receive the same default-settings updates. High-water marks and main-win dates are reconstructed from the relevant unreversed trade history for both current accounts and undo snapshots; old milestones and stages are not retroactively rewritten. For incomplete legacy histories, a known qualifying date supplies the cutoff; if no date can be recovered, the account remains loadable but qualifying results are blocked until a valid main-win date is available. Version `1` purchases retain their original $90.20 cost. The original browser storage key is retained. Imports are validated before replacing the workspace and limited to 10 MB. Unsupported versions are rejected instead of being guessed; future migration steps belong in `parseBackup` in `src/domain.js`. Damaged saved data is preserved and trading is disabled until importing a valid backup or resetting.
 
 ## Verification
 
@@ -83,6 +85,7 @@ npm run test:trailing
 npm run test:qualifying-date
 npm run test:account-names
 npm run test:settings
+npm run test:defaults
 ```
 
 Browser checks use a fresh headless Microsoft Edge context at http://127.0.0.1:5173 and do not change your normal browser's data. Set `TRACKER_BROWSER=chrome` or `TRACKER_URL` to use another installed Chromium browser or preview URL. Screenshots are written to the ignored `artifacts/` folder.

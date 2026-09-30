@@ -96,7 +96,7 @@ async function archivedView(page, ids) {
     const funded = id.startsWith('funded-');
     const passed = !funded && !['eval-3', 'eval-7'].includes(id);
     await expect(tile(page, id)).toBeVisible();
-    await expect(tile(page, id).locator(':scope > strong')).toHaveText(funded && id === 'funded-4' ? '$50,000' : passed ? '$53,000' : '$48,000');
+    await expect(tile(page, id).locator(':scope > strong')).toHaveText(funded && id === 'funded-4' ? '$49,900' : passed ? '$53,000' : '$48,000');
     await expect(tile(page, id)).toContainText(funded ? 'Funded Failed' : passed ? 'Evaluation Passed' : 'Evaluation Failed');
     if (funded) {
       await expect(tile(page, id)).toContainText(id === 'funded-4' ? 'Cycle 2' : 'Cycle 1');
@@ -212,7 +212,7 @@ try {
   await accountsView(page);
 
   current = await record(page, 'funded-2', 'win', historicalDate);
-  assert.equal(account(current, 'funded-2').balance, 54200);
+  assert.equal(account(current, 'funded-2').balance, 54175);
   assert.deepEqual(account(current, 'funded-2').qualifyingDates, [historicalDate]);
   await expect(button(page, 'funded-2', 'win')).toBeDisabled();
   await expect(button(page, 'funded-2', 'loss')).toBeEnabled();
@@ -220,7 +220,7 @@ try {
   await expect(button(page, 'funded-2', 'win')).toBeEnabled();
   current = await record(page, 'funded-2', 'win');
   assert.deepEqual(account(current, 'funded-2').qualifyingDates, [historicalDate, tradeDate]);
-  assert.equal(account(current, 'funded-2').balance, 54400);
+  assert.equal(account(current, 'funded-2').balance, 54350);
   current = await record(page, 'eval-7', 'loss');
   assert.equal(account(current, 'eval-7').stage, 'evaluation_failed');
   assert.equal(account(current, 'eval-7').balance, 48000);
@@ -348,7 +348,7 @@ try {
   await accountsView(payoutPage);
   await tile(payoutPage, 'funded-4').getByRole('button', { name: 'Take $3,000 payout', exact: true }).click();
   assert.equal(account(await read(payoutPage), 'funded-4').cycle, 2);
-  assert.equal(account(await read(payoutPage), 'funded-4').balance, 51800);
+  assert.equal(account(await read(payoutPage), 'funded-4').balance, 51700);
   assert.equal(summarize(await read(payoutPage)).withdrawn, 3000);
   await tile(payoutPage, 'funded-4').getByRole('button', { name: 'View Funded 04', exact: true }).click();
   await record(payoutPage, 'funded-4', 'loss');
@@ -356,7 +356,7 @@ try {
   const beforeFundedFailure = await read(payoutPage);
   const fundedFailure = await record(payoutPage, 'funded-4', 'loss');
   assert.equal(account(fundedFailure, 'funded-4').stage, 'funded_failed');
-  assert.equal(account(fundedFailure, 'funded-4').balance, 50000);
+  assert.equal(account(fundedFailure, 'funded-4').balance, 49900);
   assert.equal(account(fundedFailure, 'funded-4').cycle, 2);
   assert.equal(summarize(fundedFailure).withdrawn, 3000);
   assert.equal(summarize(fundedFailure).costCents, summarize(seed).costCents);
@@ -387,7 +387,7 @@ try {
   await filter(payoutPage, 'All accounts').click();
   await expect(button(payoutPage, 'funded-4', 'loss')).toBeEnabled();
   await expect(button(payoutPage, 'funded-4', 'loss')).toContainText('$800');
-  assert.equal(account(await read(payoutPage), 'funded-4').balance, 50800);
+  assert.equal(account(await read(payoutPage), 'funded-4').balance, 50700);
   assert.equal(account(await read(payoutPage), 'funded-4').mainAttempts, 1);
   assert.equal(summarize(await read(payoutPage)).withdrawn, 3000);
   const { context: fundedMobileContext, page: fundedMobile } = await workspace(fundedBackup, { width: 390, height: 844 });

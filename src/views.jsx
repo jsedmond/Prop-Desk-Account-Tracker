@@ -74,6 +74,13 @@ export function SettingsView({ state, onSave, onExport, onImport, onReset, disab
   const dirty = Object.keys(DEFAULT_SETTINGS).some(key => draftValue(key, draft[key]) !== state.settings[key]);
   const pendingAccountRules = untradedEvaluations(state).some(account =>
     Object.keys(DEFAULT_SETTINGS).some(key => account.rules[key] !== state.settings[key]));
+  const canRestoreDefaults = pendingAccountRules || Object.keys(DEFAULT_SETTINGS).some(key =>
+    state.settings[key] !== DEFAULT_SETTINGS[key] || draftValue(key, draft[key]) !== DEFAULT_SETTINGS[key]);
+  const restoreDefaults = () => {
+    const issue = onSave({ ...DEFAULT_SETTINGS });
+    setError(issue || '');
+    if (!issue) setDraft(settingsDraft(DEFAULT_SETTINGS));
+  };
   const submit = event => {
     event.preventDefault();
     const settings = Object.fromEntries(Object.entries(draft).map(([key, value]) => [key, draftValue(key, value)]));
@@ -85,7 +92,7 @@ export function SettingsView({ state, onSave, onExport, onImport, onReset, disab
     {error && <p className="form-error" role="alert">{error}</p>}
     <div className="settings-save"><span>{dirty ? 'Unsaved rule changes' : pendingAccountRules ? 'Account rules pending' : 'All rules saved'}</span><button className="secondary" type="button" disabled={!dirty || disabled} onClick={() => { setDraft(settingsDraft(state.settings)); setError(''); }}>Discard changes</button><button className="primary" disabled={(!dirty && !pendingAccountRules) || disabled} type="submit"><Save size={16} />Save rules</button></div>
   </form><section className="settings-band backup-band"><div className="settings-description"><h2>Backup & restore</h2><p>Backups include account balances, rules, history, and undo state.</p></div><div className="backup-actions"><button className="secondary" onClick={onExport}><Download size={17} />Export backup</button><button className="secondary" onClick={() => fileRef.current.click()}><Upload size={17} />Import backup</button><input ref={fileRef} className="visually-hidden" type="file" accept="application/json,.json" aria-label="Choose backup file" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) onImport(file); }} /></div></section>
-  <section className="settings-band reset-band"><div className="settings-description"><h2>Reset workspace</h2><p>Start {state.settings.startingEvaluations} fresh evaluations using your saved rules. Current history and undo state will be cleared.</p></div><div><button className="danger-button" onClick={onReset}><RotateCcw size={16} />Reset all data</button></div></section>
+  <section className="settings-band reset-band"><div className="settings-description"><h2>Reset workspace</h2><p>Start {state.settings.startingEvaluations} fresh evaluations using your saved rules. Current history and undo state will be cleared.</p></div><div className="reset-actions"><button className="danger-button" onClick={onReset}><RotateCcw size={16} />Reset all data</button><button className="secondary" title="Restore default settings" disabled={!canRestoreDefaults || disabled} onClick={restoreDefaults}><RotateCcw size={16} />Restore default settings</button></div></section>
   </div>;
 }
 

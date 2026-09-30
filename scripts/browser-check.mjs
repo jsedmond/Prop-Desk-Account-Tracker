@@ -58,10 +58,10 @@ try {
     await getWin().click();
     if (day !== '2026-09-28') assert.equal(await getWin().isDisabled(), true);
   }
-  assert.equal(funded(await read()).balance, 54800);
+  assert.equal(funded(await read()).balance, 54700);
   await page.screenshot({ path: 'artifacts/payout-ready-desktop.png', fullPage: true });
   await page.locator('.current-account').getByRole('button', { name: 'Take $3,000 payout' }).click();
-  assert.equal(funded(await read()).balance, 51800);
+  assert.equal(funded(await read()).balance, 51700);
   assert.equal(funded(await read()).cycle, 2);
   await getLoss().click();
   assert.match(await getLoss().innerText(), /\$800/);
@@ -71,9 +71,9 @@ try {
   await page.getByRole('button', { name: 'Undo last action' }).click();
   assert.equal(funded(await read()).stage, 'main');
   assert.equal(await page.locator('.account-card[data-account-id="funded-1"]').count(), 1);
-  assert.equal(funded(await read()).balance, 50800);
+  assert.equal(funded(await read()).balance, 50700);
   await page.reload();
-  assert.equal(funded(await read()).balance, 50800);
+  assert.equal(funded(await read()).balance, 50700);
 
   await nav('History').click();
   await page.getByRole('heading', { name: 'Activity history' }).waitFor();
@@ -94,7 +94,7 @@ try {
   await download.saveAs('artifacts/exported-backup.json');
   await page.getByRole('button', { name: 'Reset all data', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
-  assert.equal(funded(await read()).balance, 50800);
+  assert.equal(funded(await read()).balance, 50700);
   await page.getByRole('button', { name: 'Reset all data', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Reset all data', exact: true }).click();
   assert.equal((await read()).events.length, 0);
@@ -103,11 +103,11 @@ try {
   await nav('Settings').click();
   await page.getByLabel('Choose backup file').setInputFiles('artifacts/exported-backup.json');
   await page.getByRole('dialog').getByRole('button', { name: 'Restore backup', exact: true }).click();
-  assert.equal(funded(await read()).balance, 50800);
+  assert.equal(funded(await read()).balance, 50700);
   await nav('Settings').click();
   await page.getByLabel('Choose backup file').setInputFiles({ name: 'broken.json', mimeType: 'application/json', buffer: Buffer.from('{invalid') });
   await page.getByRole('status').filter({ hasText: 'Import failed' }).waitFor();
-  assert.equal(funded(await read()).balance, 50800);
+  assert.equal(funded(await read()).balance, 50700);
 
   const mobile = await context.newPage();
   await mobile.setViewportSize({ width: 390, height: 844 });
