@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Download, Upload, RotateCcw, Save, History, Check, X, Undo2, ChevronLeft, ChevronRight, Wallet, TrendingUp, TriangleAlert, Receipt, GitBranch, Pencil } from 'lucide-react';
-import { accountName, defaultAccountName, DEFAULT_SETTINGS, MAX_ACCOUNT_NAME_LENGTH, reversedActions, STAGES, summarize } from './domain.js';
+import { accountName, defaultAccountName, DEFAULT_SETTINGS, MAX_ACCOUNT_NAME_LENGTH, reversedActions, STAGES, summarize, untradedEvaluations } from './domain.js';
 
 const money = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 const costMoney = cents => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
@@ -41,7 +41,7 @@ export function RenameAccount({ account, onSave, onClose, disabled }) {
 }
 
 const fields = [
-  { title: 'Evaluation accounts', description: 'Updated rules apply to waiting evaluations. Evaluation cost applies to new purchases; the starting count applies on reset.', items: [
+  { title: 'Evaluation accounts', description: 'Updated rules apply to evaluations with no trades taken, including the active account. Evaluation cost applies to new purchases; the starting count applies on reset.', items: [
     ['startingEvaluations', 'Starting evaluations', 'count'],
     ['evaluationCostCents', 'Cost per evaluation', 'cost'],
     ['evaluationStart', 'Starting balance', 'money'],
@@ -72,6 +72,8 @@ export function SettingsView({ state, onSave, onExport, onImport, onReset, disab
   const fileRef = useRef(null);
   useEffect(() => { setDraft(settingsDraft(state.settings)); setError(''); }, [state.settings]);
   const dirty = Object.keys(DEFAULT_SETTINGS).some(key => draftValue(key, draft[key]) !== state.settings[key]);
+  const pendingAccountRules = untradedEvaluations(state).some(account =>
+    Object.keys(DEFAULT_SETTINGS).some(key => account.rules[key] !== state.settings[key]));
   const submit = event => {
     event.preventDefault();
     const settings = Object.fromEntries(Object.entries(draft).map(([key, value]) => [key, draftValue(key, value)]));
@@ -81,7 +83,7 @@ export function SettingsView({ state, onSave, onExport, onImport, onReset, disab
   return <div className="settings-view"><form onSubmit={submit}>
     {fields.map(group => <section className="settings-band" key={group.title}><div className="settings-description"><h2>{group.title}</h2><p>{group.description}</p></div><div className="settings-fields">{group.items.map(([key, label, kind]) => <div className="setting-field" key={key}><label htmlFor={`setting-${key}`}>{label}</label><div className="number-field">{kind !== 'count' && <span aria-hidden="true">$</span>}<input id={`setting-${key}`} type="number" min={kind === 'cost' ? 0 : 1} max={key === 'startingEvaluations' ? 100 : key === 'qualifyingWins' ? 30 : kind === 'cost' ? 1000000 : 100000000} step={kind === 'cost' ? '0.01' : 1} value={draft[key]} required disabled={disabled} onChange={event => setDraft(previous => ({ ...previous, [key]: event.target.value }))} /></div></div>)}</div></section>)}
     {error && <p className="form-error" role="alert">{error}</p>}
-    <div className="settings-save"><span>{dirty ? 'Unsaved rule changes' : 'All rules saved'}</span><button className="secondary" type="button" disabled={!dirty || disabled} onClick={() => { setDraft(settingsDraft(state.settings)); setError(''); }}>Discard changes</button><button className="primary" disabled={!dirty || disabled} type="submit"><Save size={16} />Save rules</button></div>
+    <div className="settings-save"><span>{dirty ? 'Unsaved rule changes' : pendingAccountRules ? 'Account rules pending' : 'All rules saved'}</span><button className="secondary" type="button" disabled={!dirty || disabled} onClick={() => { setDraft(settingsDraft(state.settings)); setError(''); }}>Discard changes</button><button className="primary" disabled={(!dirty && !pendingAccountRules) || disabled} type="submit"><Save size={16} />Save rules</button></div>
   </form><section className="settings-band backup-band"><div className="settings-description"><h2>Backup & restore</h2><p>Backups include account balances, rules, history, and undo state.</p></div><div className="backup-actions"><button className="secondary" onClick={onExport}><Download size={17} />Export backup</button><button className="secondary" onClick={() => fileRef.current.click()}><Upload size={17} />Import backup</button><input ref={fileRef} className="visually-hidden" type="file" accept="application/json,.json" aria-label="Choose backup file" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) onImport(file); }} /></div></section>
   <section className="settings-band reset-band"><div className="settings-description"><h2>Reset workspace</h2><p>Start {state.settings.startingEvaluations} fresh evaluations using your saved rules. Current history and undo state will be cleared.</p></div><div><button className="danger-button" onClick={onReset}><RotateCcw size={16} />Reset all data</button></div></section>
   </div>;

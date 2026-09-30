@@ -56,11 +56,11 @@ The buttons show the account's current win and loss amounts. Passed and failed e
 
 Use the pencil beside an account name to enter an actual account number, partial number, or name (up to 48 characters). Leading zeros are preserved. Evaluation and funded names are independent, including after an evaluation passes. Clearing the field or using **Use default name** restores its original label. Names appear in account tiles, the current-account panel, and history, and survive reloads and backups. Rename actions are recorded in history and can be undone without changing balances, purchase costs, or trade progress. Internal account IDs and queue numbers do not change.
 
-The evaluation queue still has one primary account. Recording a result on a waiting evaluation starts that account without replacing the primary. When the primary passes or fails, an evaluation already trading becomes primary before an untouched waiting account. Active evaluations retain their rule snapshots.
+The evaluation queue still has one primary account. Recording a result on a waiting evaluation starts that account without replacing the primary. When the primary passes or fails, an evaluation already trading becomes primary before an untouched waiting account. Evaluations with recorded results or open trades retain their rule snapshots.
 
 Each result can be undone in one step, including its queue changes and milestones. Previously saved open trades remain compatible: use their tile's Win or Loss button to close them with their saved terms. Undo restores that pending trade. The tracker does not inspect market prices or detect patterns.
 
-Every amount, the evaluation failure level, starting account count, and qualifying-day requirement is editable in Settings. Active evaluations and funded cycles retain a snapshot of their rules. Changes apply to waiting evaluations, newly created funded accounts, and the next funded cycle. Evaluation fee changes apply only to future purchases or a fresh reset. Purchase prices are stored as integer cents to preserve exact totals. The starting account count applies when resetting the workspace. A newly funded balance comes from its evaluation's original starting balance.
+Every amount, the evaluation failure level, starting account count, and qualifying-day requirement is editable in Settings. Changes apply to evaluations with no recorded results or open trades, whether waiting or active, as well as newly created funded accounts and the next funded cycle. Untouched evaluations also update their starting balance and initial drawdown level. Evaluations that have traded and existing funded cycles retain their rule snapshots; saved history is unchanged. Undone results do not count as trades taken. Evaluations with existing balance or high-water progress remain protected even if legacy history is incomplete. If an untouched account still has older rules, **Save rules** remains available to apply the already-saved settings without changing any field. Evaluation fee changes apply only to future purchases or a fresh reset. Purchase prices are stored as integer cents to preserve exact totals. The starting account count applies when resetting the workspace. A newly funded balance comes from its evaluation's original starting balance.
 
 ## History and undo
 
@@ -82,6 +82,7 @@ npm run test:continuation
 npm run test:trailing
 npm run test:qualifying-date
 npm run test:account-names
+npm run test:settings
 ```
 
 Browser checks use a fresh headless Microsoft Edge context at http://127.0.0.1:5173 and do not change your normal browser's data. Set `TRACKER_BROWSER=chrome` or `TRACKER_URL` to use another installed Chromium browser or preview URL. Screenshots are written to the ignored `artifacts/` folder.

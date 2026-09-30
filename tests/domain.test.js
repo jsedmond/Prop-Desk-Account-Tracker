@@ -194,15 +194,91 @@ test('repeated undo followed by a new action keeps audit history and correct sta
   assert.equal(parseBackup(exportBackup(state)).events.length, state.events.length);
 });
 
-test('settings change waiting evaluations and future cycles while active rules are retained', () => {
+test('settings change untouched active and waiting evaluations and future funded cycles', () => {
   const initial = createState();
   const updated = act(initial, { type: 'settings', settings: { ...DEFAULT_SETTINGS, evaluationWin: 2000, fundedMainWin: 5000 } });
-  assert.equal(get(updated, 'eval-1').rules.evaluationWin, 1500);
+  assert.equal(get(updated, 'eval-1').rules.evaluationWin, 2000);
   assert.equal(get(updated, 'eval-2').rules.evaluationWin, 2000);
   assert.deepEqual(act(updated, { type: 'undo' }).settings, initial.settings);
   const paid = act(act(readyState(), { type: 'settings', settings: { ...DEFAULT_SETTINGS, fundedMainWin: 5000 } }), { type: 'payout', accountId: 'funded-1' });
   assert.equal(get(paid).rules.fundedMainWin, 5000);
   assert.equal(get(paid).balance, 51800);
+});
+
+test('settings refresh an untraded active evaluation baseline without changing identity, costs or history', () => {
+  const initial = act(createState(), { type: 'rename_account', accountId: 'eval-1', name: '000123' });
+  const updated = act(initial, { type: 'settings', settings: {
+    ...DEFAULT_SETTINGS, evaluationWin: 1000, evaluationStart: 60000,
+    evaluationTarget: 65000, evaluationFailure: 57500, evaluationCostCents: 9500,
+  } });
+  for (const account of updated.accounts) {
+    assert.equal(account.balance, 60000);
+    assert.equal(account.startingBalance, 60000);
+    assert.equal(account.evaluationHighWater, 60000);
+    assert.equal(evaluationFailureLevel(account), 57500);
+    assert.deepEqual(resultTerms(account), { win: 1000, loss: 1000 });
+    assert.equal(account.purchaseCostCents, 9000);
+  }
+  assert.equal(get(updated, 'eval-1').customName, '000123');
+  assert.equal(get(updated, 'eval-1').evaluationRole, 'primary');
+  assert.equal(updated.selectedId, initial.selectedId);
+  assert.deepEqual(updated.events.slice(0, -1), initial.events);
+  assert.equal(summarize(updated).trades, 0);
+  assert.equal(summarize(updated).costCents, 45000);
+  assert.equal(get(initial, 'eval-1').balance, 50000);
+  assert.deepEqual(parseBackup(exportBackup(updated)), updated);
+  assert.deepEqual(act(updated, { type: 'undo' }).accounts, initial.accounts);
+  const won = trade(updated, 'eval-1', 'win');
+  assert.equal(get(won, 'eval-1').balance, 61000);
+  assert.equal(evaluationFailureLevel(get(won, 'eval-1')), 58500);
+});
+
+test('settings retain traded evaluation rules even when the balance returns to its starting value', () => {
+  const initial = createState({ ...DEFAULT_SETTINGS, evaluationLoss: 1500 });
+  const flat = trade(trade(initial, 'eval-1', 'loss'), 'eval-1', 'win');
+  assert.equal(get(flat, 'eval-1').balance, 50000);
+  const updated = act(flat, { type: 'settings', settings: { ...DEFAULT_SETTINGS, evaluationWin: 1000 } });
+  assert.deepEqual(get(updated, 'eval-1'), get(flat, 'eval-1'));
+  assert.equal(get(updated, 'eval-2').rules.evaluationWin, 1000);
+  assert.deepEqual(updated.events.slice(0, -1), flat.events);
+  assert.equal(get(trade(updated, 'eval-1', 'win'), 'eval-1').balance, 51500);
+  assert.deepEqual(parseBackup(exportBackup(updated)), updated);
+});
+
+test('settings ignore undone trades when deciding whether an active evaluation is untouched', () => {
+  const initial = createState();
+  const undone = act(trade(initial, 'eval-1', 'win'), { type: 'undo' });
+  const restored = parseBackup(exportBackup(undone));
+  const updated = act(restored, { type: 'settings', settings: { ...DEFAULT_SETTINGS, evaluationWin: 1000 } });
+  assert.equal(get(updated, 'eval-1').rules.evaluationWin, 1000);
+  assert.equal(summarize(updated).trades, 0);
+  assert.deepEqual(updated.events.slice(0, -1), restored.events);
+  assert.deepEqual(act(updated, { type: 'undo' }).accounts, initial.accounts);
+  assert.equal(get(trade(updated, 'eval-1', 'win'), 'eval-1').balance, 51000);
+});
+
+test('settings update a newly promoted untouched evaluation but preserve archived and funded accounts', () => {
+  const initial = fundedState();
+  const failed = trade(trade(initial, 'eval-2', 'loss'), 'eval-2', 'loss');
+  const updated = act(failed, { type: 'settings', settings: {
+    ...DEFAULT_SETTINGS, evaluationWin: 1000, fundedMainWin: 5000,
+  } });
+  assert.equal(get(updated, 'eval-3').stage, STAGES.EVALUATION);
+  assert.equal(get(updated, 'eval-3').rules.evaluationWin, 1000);
+  for (const id of ['eval-1', 'eval-2', 'funded-1']) {
+    assert.deepEqual(get(updated, id), get(failed, id));
+  }
+  assert.deepEqual(parseBackup(exportBackup(updated)), updated);
+});
+
+test('settings protect legacy evaluation progress when trade history is incomplete', () => {
+  const initial = createState();
+  initial.accounts[0].balance = 51000;
+  initial.accounts[0].evaluationHighWater = 51000;
+  const restored = parseBackup(exportBackup(initial));
+  const updated = act(restored, { type: 'settings', settings: { ...DEFAULT_SETTINGS, evaluationWin: 1000 } });
+  assert.deepEqual(get(updated, 'eval-1'), get(restored, 'eval-1'));
+  assert.equal(get(updated, 'eval-2').rules.evaluationWin, 1000);
 });
 
 test('backup round-trip includes undo and preserved reversed events', () => {

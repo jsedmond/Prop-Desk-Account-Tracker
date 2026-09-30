@@ -132,6 +132,17 @@ export function resultTerms(account) {
   return tradeTerms(account);
 }
 
+export function untradedEvaluations(state) {
+  const reversed = reversedActions(state);
+  const tradedAccounts = new Set(state.events
+    .filter(event => event.type === 'trade' && !reversed.has(event.actionId))
+    .map(event => event.accountId));
+  return state.accounts.filter(account => account.type === 'evaluation'
+    && [STAGES.WAITING, STAGES.EVALUATION].includes(account.stage)
+    && !account.openTrade && !tradedAccounts.has(account.id)
+    && account.balance === account.startingBalance && account.evaluationHighWater === account.startingBalance);
+}
+
 function advanceEvaluation(accounts) {
   const primary = accounts.find(account => account.stage === STAGES.EVALUATION && account.evaluationRole === 'primary');
   if (primary) return primary;
@@ -302,11 +313,11 @@ export function applyAction(state, action, context = {}) {
     emit('account_renamed', { previousName, newName: accountName(account) });
   } else if (action.type === 'settings') {
     next.settings = validateSettings(action.settings);
-    for (const waiting of next.accounts.filter(item => item.stage === STAGES.WAITING)) {
-      waiting.rules = { ...next.settings };
-      waiting.balance = next.settings.evaluationStart;
-      waiting.startingBalance = next.settings.evaluationStart;
-      waiting.evaluationHighWater = next.settings.evaluationStart;
+    for (const evaluation of untradedEvaluations(next)) {
+      evaluation.rules = { ...next.settings };
+      evaluation.balance = next.settings.evaluationStart;
+      evaluation.startingBalance = next.settings.evaluationStart;
+      evaluation.evaluationHighWater = next.settings.evaluationStart;
     }
     emit('settings', {}, null);
   } else {
