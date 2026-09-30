@@ -1,24 +1,43 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Download, Upload, RotateCcw, Save, History, Check, X, Undo2, ChevronLeft, ChevronRight, Wallet, TrendingUp, TriangleAlert, Receipt, GitBranch } from 'lucide-react';
-import { DEFAULT_SETTINGS, reversedActions, STAGES, summarize } from './domain.js';
+import { Download, Upload, RotateCcw, Save, History, Check, X, Undo2, ChevronLeft, ChevronRight, Wallet, TrendingUp, TriangleAlert, Receipt, GitBranch, Pencil } from 'lucide-react';
+import { accountName, defaultAccountName, DEFAULT_SETTINGS, MAX_ACCOUNT_NAME_LENGTH, reversedActions, STAGES, summarize } from './domain.js';
 
 const money = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 const costMoney = cents => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
 const signed = value => `${value >= 0 ? '+' : '-'}${money(Math.abs(value))}`;
 const stageLabels = { waiting: 'Waiting', evaluation: 'Evaluation', main: 'Main profit', qualifying: 'Qualifying days', payout_ready: 'Payout ready', passed: 'Passed', evaluation_failed: 'Failed', funded_failed: 'Failed' };
 
-export function Confirmation({ title, children, confirmLabel, onConfirm, onClose, danger = false, confirmDisabled = false }) {
+export function Confirmation({ title, children, confirmLabel, onConfirm, onClose, danger = false, confirmDisabled = false, focusRef }) {
   const ref = useRef(null);
   useEffect(() => {
     const dialog = ref.current;
     dialog.showModal();
+    focusRef?.current?.focus();
     return () => { if (dialog.open) dialog.close(); };
   }, []);
   return <dialog className="confirmation-dialog" ref={ref} onCancel={onClose} onClick={event => { if (event.target === ref.current) onClose(); }} aria-labelledby="confirmation-title">
     <div className="dialog-heading"><h2 id="confirmation-title">{title}</h2><button className="icon-button" aria-label="Close confirmation" title="Close confirmation" onClick={onClose}><X size={18} /></button></div>
     <div className="dialog-body">{children}</div>
-    <div className="dialog-actions"><button className="secondary" onClick={onClose} autoFocus>Cancel</button><button className={danger ? 'danger-button' : 'primary'} disabled={confirmDisabled} onClick={onConfirm}>{confirmLabel}</button></div>
+    <div className="dialog-actions"><button className="secondary" onClick={onClose} autoFocus={!focusRef}>Cancel</button><button className={danger ? 'danger-button' : 'primary'} disabled={confirmDisabled} onClick={onConfirm}>{confirmLabel}</button></div>
   </dialog>;
+}
+
+export function RenameAccount({ account, onSave, onClose, disabled }) {
+  const [draft, setDraft] = useState(account.customName);
+  const [error, setError] = useState('');
+  const inputRef = useRef(null);
+  const unchanged = draft.trim() === account.customName;
+  const save = () => {
+    if (unchanged || disabled) return;
+    setError(onSave(draft) || '');
+  };
+  return <Confirmation title={`Rename ${defaultAccountName(account)}`} confirmLabel="Save name" onConfirm={save} onClose={onClose} confirmDisabled={unchanged || disabled} focusRef={inputRef}>
+    <form className="rename-form" onSubmit={event => { event.preventDefault(); save(); }}>
+      <label htmlFor="account-name">Account number or name</label>
+      <div className="rename-input"><input ref={inputRef} id="account-name" type="text" value={draft} maxLength={MAX_ACCOUNT_NAME_LENGTH} placeholder={defaultAccountName(account)} autoComplete="off" disabled={disabled} onChange={event => { setDraft(event.target.value); setError(''); }} /><button className="icon-button" type="button" title="Use default name" aria-label="Use default name" disabled={!draft || disabled} onClick={() => { setDraft(''); setError(''); inputRef.current.focus(); }}><RotateCcw size={16} /></button></div>
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </form>
+  </Confirmation>;
 }
 
 const fields = [
@@ -73,6 +92,7 @@ function eventTitle(event) {
   return {
     evaluation_pass: 'Evaluation passed', evaluation_failure: 'Evaluation failed',
     evaluation_added: 'Evaluation purchased',
+    account_renamed: 'Account renamed',
     trade_opened: 'Continuation trade opened',
     funded_created: 'Funded account opened', funded_failure: 'Funded account failed',
     qualifying_day: 'Qualifying day completed', payout_ready: 'Payout ready',
@@ -93,11 +113,12 @@ export function HistoryView({ state, compact = false }) {
     {!compact && <div className="history-toolbar"><div className="segmented" aria-label="Filter history">{[['all', 'All activity'], ['trades', 'Trades'], ['payouts', 'Payouts'], ['milestones', 'Milestones']].map(([key, label]) => <button key={key} aria-pressed={key === filter} className={key === filter ? 'selected' : ''} onClick={() => { setFilter(key); setPage(0); }}>{label}</button>)}</div><span>{events.length} event{events.length !== 1 ? 's' : ''}</span></div>}
     {!visible.length ? <div className="empty-state"><History size={30} /><h2>{state.events.length ? 'No matching activity' : 'A fresh start'}</h2><p>{state.events.length ? 'Activity will appear here as it happens.' : 'Your first trade will begin the account history.'}</p></div> : <><div className="history-column-labels"><span>Activity / date</span><span>Account / stage</span><span>Amount</span><span>Balance before / after</span></div><div className="history-list">{visible.map(event => {
       const undone = reversed.has(event.actionId);
-      const Icon = event.type === 'undo' ? Undo2 : event.type === 'trade_opened' ? GitBranch : event.type === 'evaluation_added' ? Receipt : event.type === 'payout' ? Wallet : event.result === 'loss' || event.type.includes('failure') ? X : event.result === 'win' ? TrendingUp : Check;
+      const Icon = event.type === 'undo' ? Undo2 : event.type === 'account_renamed' ? Pencil : event.type === 'trade_opened' ? GitBranch : event.type === 'evaluation_added' ? Receipt : event.type === 'payout' ? Wallet : event.result === 'loss' || event.type.includes('failure') ? X : event.result === 'win' ? TrendingUp : Check;
+      const subject = state.accounts.find(account => account.id === event.accountId);
       const hasAmount = event.type === 'trade' || event.type === 'payout';
       return <article className={`history-event ${undone ? 'event-undone' : ''}`} key={event.id}>
         <div className="event-primary"><span className={`event-icon ${event.result === 'loss' || event.type.includes('failure') ? 'loss' : ''}`}><Icon size={17} /></span><div><strong>{eventTitle(event)} {undone && <span className="undone-tag">Undone</span>}</strong><time dateTime={event.timestamp} title={new Date(event.timestamp).toLocaleString()}>{new Date(event.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} <span>{new Date(event.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span></time>{event.type === 'trade' && <small>Trade date: {event.date}</small>}{event.pattern === 'continuation' && <small>Continuation / Opened {event.openedDate}</small>}{event.type === 'trade_opened' && <small>Win +{money(event.win)} / Loss -{money(event.loss)}</small>}</div></div>
-        <div className="event-account"><strong>{event.accountNumber ? `${event.accountType === 'funded' ? 'Funded' : 'Evaluation'} ${String(event.accountNumber).padStart(2, '0')}` : 'Workspace'}</strong><span>{event.accountType === 'funded' ? `Cycle ${event.cycle} / ` : ''}{stageLabels[event.stage] || (event.type === 'undo' ? 'Balance and progress restored' : 'Account rules')}</span></div>
+        <div className="event-account"><strong>{subject ? accountName(subject) : event.accountNumber ? defaultAccountName({ type: event.accountType, number: event.accountNumber }) : 'Workspace'}</strong><span>{event.accountType === 'funded' ? `Cycle ${event.cycle} / ` : ''}{stageLabels[event.stage] || (event.type === 'undo' ? 'Balance and progress restored' : 'Account rules')}</span>{event.type === 'account_renamed' && <small>{event.previousName} to {event.newName}</small>}</div>
         <div className={`event-amount ${event.type === 'payout' ? 'payout' : event.type === 'evaluation_added' ? 'red' : event.pnl > 0 ? 'green' : event.pnl < 0 ? 'red' : ''}`}>{event.type === 'evaluation_added' ? `-${costMoney(event.costCents)}` : hasAmount ? event.type === 'payout' ? money(-event.pnl) : signed(event.pnl) : '--'}{event.type === 'payout' && <small>Withdrawn</small>}{event.type === 'evaluation_added' && <small>Evaluation cost</small>}</div>
         <div className="event-balances">{hasAmount ? <><span>{money(event.balanceBefore)}</span><strong>{money(event.balanceAfter)}</strong></> : <span>--</span>}</div>
       </article>;

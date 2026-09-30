@@ -1,9 +1,9 @@
-export const VERSION = 5;
+export const VERSION = 6;
 // Keep the existing storage key so saved workspaces are migrated in place.
 export const STORAGE_KEY = 'prop-desk.v1';
 export const DEFAULT_SETTINGS = Object.freeze({
-  startingEvaluations: 10,
-  evaluationCostCents: 9020,
+  startingEvaluations: 5,
+  evaluationCostCents: 9000,
   evaluationStart: 50000,
   evaluationTarget: 53000,
   evaluationFailure: 48000,
@@ -23,6 +23,23 @@ export const STAGES = Object.freeze({
   EVAL_FAILED: 'evaluation_failed', MAIN: 'main', QUALIFYING: 'qualifying',
   PAYOUT: 'payout_ready', FUNDED_FAILED: 'funded_failed',
 });
+
+export const MAX_ACCOUNT_NAME_LENGTH = 48;
+
+export function defaultAccountName(account) {
+  return `${account.type === 'funded' ? 'Funded' : 'Evaluation'} ${String(account.number).padStart(2, '0')}`;
+}
+
+export function accountName(account) {
+  return account.customName || defaultAccountName(account);
+}
+
+function validateAccountName(value) {
+  if (typeof value !== 'string' || value.length > MAX_ACCOUNT_NAME_LENGTH || /[\u0000-\u001f\u007f-\u009f]/.test(value)) {
+    throw new Error(`Account name must be a single line of at most ${MAX_ACCOUNT_NAME_LENGTH} characters.`);
+  }
+  return value.trim();
+}
 
 export function isArchived(account) {
   return (account?.type === 'evaluation' && [STAGES.EVAL_FAILED, STAGES.PASSED].includes(account.stage))
@@ -70,7 +87,7 @@ export function createState(settings = DEFAULT_SETTINGS) {
   return {
     version: VERSION, settings: rules,
     accounts: Array.from({ length: rules.startingEvaluations }, (_, index) => ({
-      id: `eval-${index + 1}`, number: index + 1, type: 'evaluation',
+      id: `eval-${index + 1}`, number: index + 1, type: 'evaluation', customName: '',
       stage: index === 0 ? STAGES.EVALUATION : STAGES.WAITING,
       evaluationRole: index === 0 ? 'primary' : null, openTrade: null,
       balance: rules.evaluationStart, startingBalance: rules.evaluationStart, cycle: 0, mainAttempts: 0,
@@ -209,7 +226,7 @@ export function applyAction(state, action, context = {}) {
           account.evaluationRole = null;
           emit('evaluation_pass');
           const funded = {
-            id: `funded-${account.number}`, number: account.number, type: 'funded',
+            id: `funded-${account.number}`, number: account.number, type: 'funded', customName: '',
             stage: STAGES.MAIN, balance: account.startingBalance, startingBalance: account.startingBalance, cycle: 1,
             mainAttempts: 0, mainWinDate: null, qualifyingDates: [], openTrade: null, rules: { ...state.settings },
           };
@@ -265,7 +282,7 @@ export function applyAction(state, action, context = {}) {
     if (!Number.isSafeInteger(number)) throw new Error('Account numbering limit reached.');
     const hasActiveEvaluation = next.accounts.some(item => item.stage === STAGES.EVALUATION);
     const added = {
-      id: `eval-${number}`, number, type: 'evaluation',
+      id: `eval-${number}`, number, type: 'evaluation', customName: '',
       stage: hasActiveEvaluation ? STAGES.WAITING : STAGES.EVALUATION,
       evaluationRole: hasActiveEvaluation ? null : 'primary', openTrade: null,
       balance: state.settings.evaluationStart, startingBalance: state.settings.evaluationStart,
@@ -276,6 +293,13 @@ export function applyAction(state, action, context = {}) {
     next.accounts.push(added);
     if (!hasActiveEvaluation) next.selectedId = added.id;
     emit('evaluation_added', { costCents: added.purchaseCostCents }, added);
+  } else if (action.type === 'rename_account') {
+    if (!account) throw new Error('Account not found.');
+    const customName = validateAccountName(action.name);
+    if (customName === account.customName) throw new Error('This account already has that name.');
+    const previousName = accountName(account);
+    account.customName = customName;
+    emit('account_renamed', { previousName, newName: accountName(account) });
   } else if (action.type === 'settings') {
     next.settings = validateSettings(action.settings);
     for (const waiting of next.accounts.filter(item => item.stage === STAGES.WAITING)) {
@@ -357,6 +381,7 @@ function validateAccounts(accounts, settings, selectedId) {
       throw new Error('Invalid account identity or stage.');
     }
     ids.add(account.id);
+    if (validateAccountName(account.customName) !== account.customName) throw new Error('Invalid account name.');
     validateSettings(account.rules);
     if (account.type === 'evaluation' && (!Number.isSafeInteger(account.purchaseCostCents) || account.purchaseCostCents < 0 || account.purchaseCostCents > 100000000)) throw new Error('Invalid evaluation purchase cost.');
     if (!Number.isSafeInteger(account.balance) || !Number.isSafeInteger(account.startingBalance) || account.startingBalance <= 0 || !Number.isSafeInteger(account.cycle) || account.cycle < (account.type === 'funded' ? 1 : 0) || (account.type === 'evaluation' && account.cycle !== 0) || !Number.isSafeInteger(account.mainAttempts) || account.mainAttempts < 0 || account.mainAttempts > 2) throw new Error('Invalid account balance or cycle.');
@@ -409,10 +434,11 @@ function validateAccounts(accounts, settings, selectedId) {
 }
 
 function migrateVersionOne(state) {
-  const migrateSettings = settings => settings && ({ ...settings, evaluationCostCents: DEFAULT_SETTINGS.evaluationCostCents });
+  // Version 1 purchases predate configurable costs and were priced at $90.20.
+  const migrateSettings = settings => settings && ({ ...settings, evaluationCostCents: 9020 });
   const migrateAccounts = accounts => Array.isArray(accounts) ? accounts.map(account => account && ({
     ...account, rules: migrateSettings(account.rules),
-    ...(account.type === 'evaluation' ? { purchaseCostCents: DEFAULT_SETTINGS.evaluationCostCents } : {}),
+    ...(account.type === 'evaluation' ? { purchaseCostCents: 9020 } : {}),
   })) : accounts;
   return {
     ...state, version: 2, settings: migrateSettings(state.settings),
@@ -493,12 +519,27 @@ function migrateVersionFour(state) {
     }) : accounts;
   };
   return {
-    ...state, version: VERSION, accounts: migrateAccounts(state.accounts, history),
+    ...state, version: 5, accounts: migrateAccounts(state.accounts, history),
     undoStack: Array.isArray(state.undoStack) ? state.undoStack.map(snapshot => {
       if (!snapshot) return snapshot;
       const actionIndex = history.findIndex(event => event?.actionId === snapshot.actionId);
       return { ...snapshot, accounts: migrateAccounts(snapshot.accounts, history.slice(0, Math.max(0, actionIndex))) };
     }) : state.undoStack,
+  };
+}
+
+function migrateVersionFive(state) {
+  const migrateAccounts = accounts => Array.isArray(accounts) ? accounts.map(account => account && ({ ...account, customName: '' })) : accounts;
+  const migrateSettings = settings => settings && ({
+    ...settings,
+    startingEvaluations: settings.startingEvaluations === 10 ? DEFAULT_SETTINGS.startingEvaluations : settings.startingEvaluations,
+    evaluationCostCents: settings.evaluationCostCents === 9020 ? DEFAULT_SETTINGS.evaluationCostCents : settings.evaluationCostCents,
+  });
+  return {
+    ...state, version: VERSION, settings: migrateSettings(state.settings), accounts: migrateAccounts(state.accounts),
+    undoStack: Array.isArray(state.undoStack) ? state.undoStack.map(snapshot => snapshot && ({
+      ...snapshot, settings: migrateSettings(snapshot.settings), accounts: migrateAccounts(snapshot.accounts),
+    })) : state.undoStack,
   };
 }
 
@@ -510,11 +551,12 @@ export function parseBackup(text) {
   if (state?.version === 2) state = migrateVersionTwo(state);
   if (state?.version === 3) state = migrateVersionThree(state);
   if (state?.version === 4) state = migrateVersionFour(state);
-  if (!state || state.version !== VERSION) throw new Error('Unsupported backup version. Expected version 1, 2, 3, 4, or 5.');
+  if (state?.version === 5) state = migrateVersionFive(state);
+  if (!state || state.version !== VERSION) throw new Error('Unsupported backup version. Expected version 1, 2, 3, 4, 5, or 6.');
   const settings = validateSettings(state.settings);
   validateAccounts(state.accounts, settings, state.selectedId);
   if (!Array.isArray(state.events) || !Array.isArray(state.undoStack)) throw new Error('Invalid backup history.');
-  const types = ['trade', 'trade_opened', 'evaluation_pass', 'evaluation_failure', 'evaluation_added', 'funded_created', 'funded_failure', 'qualifying_day', 'payout_ready', 'payout', 'settings', 'undo'];
+  const types = ['trade', 'trade_opened', 'evaluation_pass', 'evaluation_failure', 'evaluation_added', 'funded_created', 'funded_failure', 'qualifying_day', 'payout_ready', 'payout', 'account_renamed', 'settings', 'undo'];
   const ids = new Set();
   const actionIds = new Set();
   const reverted = new Set();
@@ -552,6 +594,9 @@ export function parseBackup(text) {
       }
       if (event.type === 'payout' && (event.pnl >= 0 || event.balanceBefore + event.pnl !== event.balanceAfter)) throw new Error('Invalid payout balance.');
       if (event.type === 'evaluation_added' && (event.accountType !== 'evaluation' || !Number.isSafeInteger(event.costCents) || event.costCents < 0 || event.costCents > 100000000 || event.pnl !== 0 || event.balanceBefore !== event.balanceAfter)) throw new Error('Invalid evaluation purchase event.');
+      if (event.type === 'account_renamed' && (!event.previousName || !event.newName
+        || validateAccountName(event.previousName) !== event.previousName || validateAccountName(event.newName) !== event.newName
+        || event.pnl !== 0 || event.balanceBefore !== event.balanceAfter)) throw new Error('Invalid account rename event.');
     }
     actionIds.add(event.actionId);
   }

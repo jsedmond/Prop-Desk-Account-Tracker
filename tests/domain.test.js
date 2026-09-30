@@ -9,8 +9,8 @@ function act(state, action) {
 }
 const trade = (state, accountId, result, date = '2026-09-29') => act(state, { type: 'trade', accountId, result, date });
 const get = (state, id = 'funded-1') => state.accounts.find(account => account.id === id);
-function fundedState() {
-  return trade(trade(createState(), 'eval-1', 'win'), 'eval-1', 'win');
+function fundedState(initial = createState()) {
+  return trade(trade(initial, 'eval-1', 'win'), 'eval-1', 'win');
 }
 function readyState(state = fundedState(), dates = ['2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28']) {
   state = trade(state, 'funded-1', 'win', dates[0]);
@@ -18,9 +18,9 @@ function readyState(state = fundedState(), dates = ['2026-09-25', '2026-09-26', 
   return state;
 }
 
-test('starts ten $50,000 evaluations with only one active', () => {
+test('starts five $50,000 evaluations with only one active', () => {
   const state = createState();
-  assert.equal(state.accounts.length, 10);
+  assert.equal(state.accounts.length, 5);
   assert.equal(state.accounts.filter(account => account.stage === STAGES.EVALUATION).length, 1);
   assert.ok(state.accounts.every(account => account.balance === 50000));
 });
@@ -266,31 +266,31 @@ test('storage failures are reported and malformed saved data is preserved', () =
   assert.throws(() => saveState(state, failing), /unavailable or full/);
 });
 
-test('initial ten evaluations cost exactly $902.00; passing and failing retain purchase costs', () => {
+test('initial five evaluations cost exactly $450.00; passing and failing retain purchase costs', () => {
   let state = fundedState();
   state = trade(trade(state, 'eval-2', 'loss'), 'eval-2', 'loss');
-  assert.equal(summarize(state).costCents, 90200);
-  assert.equal(summarize(state).evaluationCount, 10);
-  assert.equal(get(state, 'eval-1').purchaseCostCents, 9020);
-  assert.equal(get(state, 'eval-2').purchaseCostCents, 9020);
+  assert.equal(summarize(state).costCents, 45000);
+  assert.equal(summarize(state).evaluationCount, 5);
+  assert.equal(get(state, 'eval-1').purchaseCostCents, 9000);
+  assert.equal(get(state, 'eval-2').purchaseCostCents, 9000);
   assert.equal(summarize(state).trades, 4);
 });
 
 test('adding one evaluation records cost and queues it without changing the active evaluation', () => {
   const original = createState();
   const state = act(original, { type: 'add_evaluation' });
-  const added = get(state, 'eval-11');
-  assert.equal(state.accounts.length, 11);
+  const added = get(state, 'eval-6');
+  assert.equal(state.accounts.length, 6);
   assert.equal(added.balance, 50000);
   assert.equal(added.stage, STAGES.WAITING);
-  assert.equal(added.purchaseCostCents, 9020);
+  assert.equal(added.purchaseCostCents, 9000);
   assert.equal(state.selectedId, 'eval-1');
-  assert.equal(summarize(state).costCents, 99220);
+  assert.equal(summarize(state).costCents, 54000);
   assert.equal(summarize(state).trades, 0);
   assert.equal(state.events.at(-1).type, 'evaluation_added');
-  assert.equal(state.events.at(-1).costCents, 9020);
+  assert.equal(state.events.at(-1).costCents, 9000);
   assert.equal(state.events.at(-1).pnl, 0);
-  assert.equal(original.accounts.length, 10);
+  assert.equal(original.accounts.length, 5);
 });
 
 test('a replacement activates when the last evaluation fails and keeps the failed account', () => {
@@ -300,7 +300,7 @@ test('a replacement activates when the last evaluation fails and keeps the faile
   assert.equal(get(state, 'eval-1').stage, STAGES.EVAL_FAILED);
   assert.equal(get(state, 'eval-2').stage, STAGES.EVALUATION);
   assert.equal(state.selectedId, 'eval-2');
-  assert.equal(summarize(state).costCents, 18040);
+  assert.equal(summarize(state).costCents, 18000);
   assert.equal(summarize(state).evalFailed, 1);
   assert.deepEqual(parseBackup(exportBackup(state)), state);
 });
@@ -313,7 +313,7 @@ test('replacement evaluations also work after funded failure and pass into new f
   state = trade(trade(state, 'eval-2', 'win'), 'eval-2', 'win');
   assert.equal(get(state, 'funded-1').stage, STAGES.FUNDED_FAILED);
   assert.equal(get(state, 'funded-2').stage, STAGES.MAIN);
-  assert.equal(summarize(state).costCents, 18040);
+  assert.equal(summarize(state).costCents, 18000);
   assert.equal(summarize(state).funded, 1);
 });
 
@@ -323,27 +323,27 @@ test('undoing an addition restores costs, active selection and queue while keepi
   const undone = act(after, { type: 'undo' });
   assert.deepEqual(undone.accounts, before.accounts);
   assert.equal(undone.selectedId, before.selectedId);
-  assert.equal(summarize(undone).costCents, 9020);
+  assert.equal(summarize(undone).costCents, 9000);
   assert.equal(undone.events.at(-1).revertedActionId, after.events.at(-1).actionId);
   assert.deepEqual(parseBackup(exportBackup(undone)), undone);
   const readded = act(undone, { type: 'add_evaluation' });
   assert.equal(get(readded, 'eval-2').stage, STAGES.EVALUATION);
-  assert.equal(summarize(readded).costCents, 18040);
+  assert.equal(summarize(readded).costCents, 18000);
   assert.deepEqual(parseBackup(exportBackup(readded)), readded);
 });
 
 test('price changes affect future purchases only, retain exact cents and preserve withdrawn totals', () => {
   let state = act(readyState(), { type: 'payout', accountId: 'funded-1' });
   state = act(state, { type: 'settings', settings: { ...DEFAULT_SETTINGS, evaluationCostCents: 9125 } });
-  assert.equal(summarize(state).costCents, 90200);
+  assert.equal(summarize(state).costCents, 45000);
   state = act(state, { type: 'add_evaluation' });
-  assert.equal(summarize(state).costCents, 99325);
-  assert.equal(get(state, 'eval-11').purchaseCostCents, 9125);
-  assert.equal(get(state, 'eval-2').purchaseCostCents, 9020);
+  assert.equal(summarize(state).costCents, 54125);
+  assert.equal(get(state, 'eval-6').purchaseCostCents, 9125);
+  assert.equal(get(state, 'eval-2').purchaseCostCents, 9000);
   assert.equal(summarize(state).withdrawn, 3000);
   const restored = parseBackup(exportBackup(state));
   assert.deepEqual(restored, state);
-  assert.equal(summarize(act(restored, { type: 'undo' })).costCents, 90200);
+  assert.equal(summarize(act(restored, { type: 'undo' })).costCents, 45000);
 });
 
 function legacyBackup(state) {
@@ -358,6 +358,7 @@ function legacyBackup(state) {
       delete account.evaluationRole;
       delete account.evaluationHighWater;
       delete account.mainWinDate;
+      delete account.customName;
     }
   };
   stripCosts(legacy);
@@ -365,24 +366,33 @@ function legacyBackup(state) {
   return JSON.stringify(legacy);
 }
 
+function upgradedDefaults(state) {
+  const next = structuredClone(state);
+  for (const workspace of [next, ...next.undoStack]) {
+    if (workspace.settings.startingEvaluations === 10) workspace.settings.startingEvaluations = 5;
+    if (workspace.settings.evaluationCostCents === 9020) workspace.settings.evaluationCostCents = 9000;
+  }
+  return next;
+}
+
 test('version-one data migrates without changing trades, payouts, undo or the storage key', () => {
-  const before = readyState();
+  const before = readyState(fundedState(createState({ ...DEFAULT_SETTINGS, startingEvaluations: 10, evaluationCostCents: 9020 })));
   const paid = act(before, { type: 'payout', accountId: 'funded-1' });
   const legacy = legacyBackup(paid);
   const migrated = parseBackup(legacy);
-  assert.deepEqual(migrated, paid);
+  assert.deepEqual(migrated, upgradedDefaults(paid));
   assert.equal(migrated.version, VERSION);
   assert.equal(summarize(migrated).costCents, 90200);
   assert.deepEqual(act(migrated, { type: 'undo' }).accounts, before.accounts);
   const storage = { getItem: key => { assert.equal(key, 'prop-desk.v1'); return legacy; } };
   assert.equal(STORAGE_KEY, 'prop-desk.v1');
-  assert.deepEqual(loadState(storage).state, paid);
+  assert.deepEqual(loadState(storage).state, upgradedDefaults(paid));
   assert.equal(loadState(storage).error, null);
 });
 
 test('migration supports reversed actions and imported snapshots', () => {
-  const state = act(fundedState(), { type: 'undo' });
-  assert.deepEqual(parseBackup(legacyBackup(state)), state);
+  const state = act(fundedState(createState({ ...DEFAULT_SETTINGS, startingEvaluations: 10, evaluationCostCents: 9020 })), { type: 'undo' });
+  assert.deepEqual(parseBackup(legacyBackup(state)), upgradedDefaults(state));
   const restored = act(parseBackup(legacyBackup(state)), { type: 'undo' });
   assert.equal(restored.accounts[0].balance, 50000);
   assert.equal(summarize(restored).costCents, 90200);
@@ -393,7 +403,7 @@ test('more than 100 lifetime evaluations retain unique IDs and backup support', 
   state = act(act(state, { type: 'add_evaluation' }), { type: 'add_evaluation' });
   assert.equal(get(state, 'eval-101').number, 101);
   assert.equal(get(state, 'eval-102').number, 102);
-  assert.equal(summarize(state).costCents, 920040);
+  assert.equal(summarize(state).costCents, 918000);
   assert.deepEqual(parseBackup(exportBackup(state)), state);
 });
 
@@ -623,12 +633,12 @@ test('undo an open-trade evaluation pass restores its primary role and other par
 
 test('new evaluations join the waiting queue while continuation trades remain open', () => {
   const state = act(open(createState(), ['eval-2']), { type: 'add_evaluation' });
-  assert.equal(get(state, 'eval-11').stage, STAGES.WAITING);
-  assert.equal(get(state, 'eval-11').evaluationRole, null);
-  assert.equal(get(state, 'eval-11').openTrade, null);
+  assert.equal(get(state, 'eval-6').stage, STAGES.WAITING);
+  assert.equal(get(state, 'eval-6').evaluationRole, null);
+  assert.equal(get(state, 'eval-6').openTrade, null);
   assert.equal(get(state, 'eval-1').evaluationRole, 'primary');
   assert.ok(get(state, 'eval-2').openTrade);
-  assert.equal(summarize(state).costCents, 99220);
+  assert.equal(summarize(state).costCents, 54000);
 });
 
 test('version-two data and snapshots migrate to closed trades and original primary evaluation roles', () => {
@@ -691,9 +701,9 @@ test('backups validate closing links and retain reversed opening history for rem
     assert.throws(() => parseBackup(exportBackup(state)));
   }
   let state = act(createState(), { type: 'add_evaluation' });
-  state = open(state, ['eval-11']);
+  state = open(state, ['eval-6']);
   state = act(act(state, { type: 'undo' }), { type: 'undo' });
-  assert.equal(get(state, 'eval-11'), undefined);
+  assert.equal(get(state, 'eval-6'), undefined);
   assert.deepEqual(parseBackup(exportBackup(state)), state);
 });
 
@@ -923,7 +933,7 @@ test('archived evaluations preserve purchase costs and history and undo restores
   assert.equal(isArchived(get(failed, 'eval-1')), true);
   assert.equal(failed.accounts.length, 1);
   assert.equal(failed.selectedId, 'eval-1');
-  assert.equal(summarize(failed).costCents, 9020);
+  assert.equal(summarize(failed).costCents, 9000);
   assert.equal(summarize(failed).evaluationCount, 1);
   assert.equal(summarize(failed).evalFailed, 1);
   assert.equal(summarize(failed).trades, 2);
@@ -933,7 +943,7 @@ test('archived evaluations preserve purchase costs and history and undo restores
   const undone = act(failed, { type: 'undo' });
   assert.equal(isArchived(get(undone, 'eval-1')), false);
   assert.deepEqual(undone.accounts, firstLoss.accounts);
-  assert.equal(summarize(undone).costCents, 9020);
+  assert.equal(summarize(undone).costCents, 9000);
   assert.equal(summarize(undone).evalFailed, 0);
   assert.equal(summarize(undone).trades, 1);
   assert.equal(undone.events.length, failed.events.length + 1);
@@ -972,7 +982,7 @@ test('evaluation drawdown holds after losses and fails when balance reaches the 
   assert.equal(evaluationFailureLevel(get(failed, 'eval-1')), 50000);
   assert.equal(isArchived(get(failed, 'eval-1')), true);
   assert.equal(get(failed, 'eval-2').evaluationRole, 'primary');
-  assert.equal(summarize(failed).costCents, 90200);
+  assert.equal(summarize(failed).costCents, 45000);
   assert.deepEqual(parseBackup(exportBackup(failed)), failed);
   const undone = act(failed, { type: 'undo' });
   assert.deepEqual(undone.accounts, state.accounts);
@@ -1055,10 +1065,10 @@ test('custom drawdown distances, new evaluations and waiting settings use their 
   assert.equal(get(state, 'eval-2').evaluationHighWater, 60000);
   assert.equal(evaluationFailureLevel(get(state, 'eval-2')), 57500);
   state = act(state, { type: 'add_evaluation' });
-  assert.equal(get(state, 'eval-11').evaluationHighWater, 60000);
-  state = record(state, 'eval-11', 'win');
-  assert.equal(get(state, 'eval-11').balance, 61500);
-  assert.equal(evaluationFailureLevel(get(state, 'eval-11')), 59000);
+  assert.equal(get(state, 'eval-6').evaluationHighWater, 60000);
+  state = record(state, 'eval-6', 'win');
+  assert.equal(get(state, 'eval-6').balance, 61500);
+  assert.equal(evaluationFailureLevel(get(state, 'eval-6')), 59000);
   assert.deepEqual(parseBackup(exportBackup(state)), state);
 });
 
@@ -1106,16 +1116,16 @@ test('migration excludes reversed trades in current state and each snapshot pref
 
 test('migration handles reused account IDs and reverted waiting-account settings without carrying old peaks', () => {
   let state = act(createState(), { type: 'add_evaluation' });
-  state = record(state, 'eval-11', 'win');
+  state = record(state, 'eval-6', 'win');
   state = act(act(state, { type: 'undo' }), { type: 'undo' });
   state = act(state, { type: 'settings', settings: { ...DEFAULT_SETTINGS, evaluationStart: 60000, evaluationTarget: 65000 } });
   state = act(state, { type: 'undo' });
   state = act(state, { type: 'add_evaluation' });
-  state = record(state, 'eval-11', 'loss');
+  state = record(state, 'eval-6', 'loss');
   const migrated = parseBackup(versionThreeBackup(state));
   assert.deepEqual(migrated, state);
-  assert.equal(get(migrated, 'eval-11').evaluationHighWater, 50000);
-  assert.equal(evaluationFailureLevel(get(migrated, 'eval-11')), 48000);
+  assert.equal(get(migrated, 'eval-6').evaluationHighWater, 50000);
+  assert.equal(evaluationFailureLevel(get(migrated, 'eval-6')), 48000);
   assert.equal(get(migrated, 'eval-2').evaluationHighWater, 50000);
 });
 
@@ -1166,8 +1176,8 @@ test('passed evaluations archive without hiding funded accounts or losing costs,
   assert.equal(get(passed, 'funded-1').balance, 50000);
   assert.equal(get(passed, 'eval-1').evaluationHighWater, 53000);
   assert.equal(evaluationFailureLevel(get(passed, 'eval-1')), 50000);
-  assert.equal(summarize(passed).costCents, 90200);
-  assert.equal(summarize(passed).evaluationCount, 10);
+  assert.equal(summarize(passed).costCents, 45000);
+  assert.equal(summarize(passed).evaluationCount, 5);
   assert.equal(summarize(passed).passed, 1);
   assert.equal(summarize(passed).funded, 1);
   assert.equal(summarize(passed).trades, 2);
@@ -1180,7 +1190,7 @@ test('passed evaluations archive without hiding funded accounts or losing costs,
   assert.deepEqual(undone.accounts, before.accounts);
   assert.equal(get(undone, 'eval-1').evaluationHighWater, 51500);
   assert.equal(evaluationFailureLevel(get(undone, 'eval-1')), 49500);
-  assert.equal(summarize(undone).costCents, 90200);
+  assert.equal(summarize(undone).costCents, 45000);
   assert.equal(summarize(undone).passed, 0);
   assert.equal(summarize(undone).funded, 0);
   assert.equal(summarize(undone).trades, 1);
@@ -1208,7 +1218,7 @@ test('failed funded accounts archive while retaining payouts, costs, history and
   assert.equal(evaluationFailureLevel(get(failed, 'eval-1')), 50000);
   assert.equal(summarize(failed).withdrawn, 3000);
   assert.equal(summarize(failed).payouts, 1);
-  assert.equal(summarize(failed).costCents, 90200);
+  assert.equal(summarize(failed).costCents, 45000);
   assert.equal(summarize(failed).fundedFailed, 1);
   assert.equal(failed.events.at(-1).type, 'funded_failure');
   assert.deepEqual(parseBackup(exportBackup(failed)), failed);
@@ -1220,7 +1230,7 @@ test('failed funded accounts archive while retaining payouts, costs, history and
   assert.deepEqual(resultTerms(get(undone)), { win: 4000, loss: 800 });
   assert.equal(summarize(undone).withdrawn, 3000);
   assert.equal(summarize(undone).payouts, 1);
-  assert.equal(summarize(undone).costCents, 90200);
+  assert.equal(summarize(undone).costCents, 45000);
   assert.equal(summarize(undone).fundedFailed, 0);
   assert.deepEqual(undone.events.slice(0, -1), failed.events);
   assert.equal(undone.events.at(-1).type, 'undo');
@@ -1332,7 +1342,7 @@ test('version-four migration rebuilds main-win anchors for current state and pre
   state = record(state, 'funded-1', 'win', '2026-09-26');
   const migrated = parseBackup(versionFourBackup(state));
   assert.deepEqual(migrated, state);
-  assert.equal(migrated.version, 5);
+  assert.equal(migrated.version, VERSION);
   assert.equal(qualifyingStartDate(get(migrated)), '2026-09-25');
   assert.equal(migrated.undoStack.at(-2).accounts.find(account => account.id === 'funded-1').mainWinDate, null);
   assert.equal(migrated.undoStack.at(-1).accounts.find(account => account.id === 'funded-1').mainWinDate, '2026-09-25');

@@ -82,7 +82,7 @@ async function archived(page) {
   await expect(page.locator('article.account-card')).toHaveCount(3);
   for (const id of ['eval-1', 'eval-2', 'funded-1']) {
     await expect(tile(page, id)).toBeVisible();
-    await expect(tile(page, id).getByRole('button')).toHaveCount(0);
+    await expect(tile(page, id).getByRole('button')).toHaveCount(1);
   }
 }
 
@@ -107,7 +107,7 @@ try {
   const { context, page } = await workspace({ width: 1440, height: 1100 });
   desktopPage = page;
   assert.equal(await read(page), null, 'Production check must use an isolated fresh browser');
-  await expect(page.locator('.metric').filter({ hasText: 'Evaluation costs' }).locator('strong')).toHaveText('$902.00');
+  await expect(page.locator('.metric').filter({ hasText: 'Evaluation costs' }).locator('strong')).toHaveText('$450.00');
   await expect(page.locator('.current-account')).toContainText('Active Evaluation');
   await expect(result(tile(page, 'eval-1'), 'win')).toBeEnabled();
   await expect(result(tile(page, 'eval-2'), 'loss')).toBeEnabled();
@@ -148,10 +148,10 @@ try {
   assert.equal(summarize(current).withdrawn, 3000);
   await expect(tile(page, 'funded-1')).toHaveCount(0);
   await archived(page);
-  await page.getByRole('button', { name: 'Add evaluation for $90.20', exact: true }).click();
+  await page.getByRole('button', { name: 'Add evaluation for $90.00', exact: true }).click();
   current = await read(page);
-  assert.equal(account(current, 'eval-11').stage, 'waiting');
-  assert.equal(summarize(current).costCents, 99220);
+  assert.equal(account(current, 'eval-6').stage, 'waiting');
+  assert.equal(summarize(current).costCents, 54000);
   await screenshot(page, 'artifacts/pages-archive-desktop.png');
 
   const downloadPromise = page.waitForEvent('download');
@@ -170,8 +170,8 @@ try {
   assert.equal(summarize(await read(page)).withdrawn, 3000);
   await screenshot(page, 'artifacts/pages-desktop.png');
   await page.getByRole('button', { name: 'Undo last action', exact: true }).click();
-  assert.equal(summarize(await read(page)).costCents, 90200);
-  assert.equal(account(await read(page), 'eval-11'), undefined);
+  assert.equal(summarize(await read(page)).costCents, 45000);
+  assert.equal(account(await read(page), 'eval-6'), undefined);
   await page.getByRole('button', { name: 'Undo last action', exact: true }).click();
   assert.equal(account(await read(page), 'funded-1').stage, 'main');
   await expect(result(page.locator('.current-account'), 'loss')).toContainText('$800');

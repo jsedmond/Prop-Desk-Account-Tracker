@@ -21,8 +21,8 @@ try {
   await page.goto(url);
   await page.getByRole('heading', { name: 'Account overview' }).waitFor();
   assert.equal(await page.locator('.balance').innerText(), '$50,000.00');
-  assert.equal(await page.locator('.account-card').count(), 6);
-  assert.equal(await page.locator('.metric').filter({ hasText: 'Evaluation costs' }).locator('strong').innerText(), '$902.00');
+  assert.equal(await page.locator('.account-card').count(), 5);
+  assert.equal(await page.locator('.metric').filter({ hasText: 'Evaluation costs' }).locator('strong').innerText(), '$450.00');
   await noOverflow();
   await page.screenshot({ path: 'artifacts/dashboard-desktop.png', fullPage: true });
 
@@ -98,7 +98,7 @@ try {
   await page.getByRole('button', { name: 'Reset all data', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Reset all data', exact: true }).click();
   assert.equal((await read()).events.length, 0);
-  assert.equal((await read()).accounts.length, 10);
+  assert.equal((await read()).accounts.length, 5);
 
   await nav('Settings').click();
   await page.getByLabel('Choose backup file').setInputFiles('artifacts/exported-backup.json');
@@ -136,15 +136,15 @@ try {
   assert.equal(failed.accounts[0].stage, 'evaluation_failed');
   assert.equal(failed.selectedId, 'eval-2');
   assert.equal(await cleanPage.locator('.account-card[data-account-id="eval-1"]').count(), 0);
-  await cleanPage.getByRole('button', { name: 'Add evaluation for $90.20', exact: true }).click();
+  await cleanPage.getByRole('button', { name: 'Add evaluation for $90.00', exact: true }).click();
   const replaced = await cleanPage.evaluate(key => JSON.parse(localStorage.getItem(key)), STORAGE_KEY);
-  assert.equal(replaced.accounts.length, 11);
+  assert.equal(replaced.accounts.length, 6);
   assert.equal(replaced.accounts.at(-1).stage, 'waiting');
   assert.equal(replaced.selectedId, 'eval-2');
-  assert.equal(await cleanPage.locator('.metric').filter({ hasText: 'Evaluation costs' }).locator('strong').innerText(), '$992.20');
+  assert.equal(await cleanPage.locator('.metric').filter({ hasText: 'Evaluation costs' }).locator('strong').innerText(), '$540.00');
   await cleanPage.screenshot({ path: 'artifacts/replacement-mobile.png', fullPage: true });
   await cleanPage.getByRole('button', { name: 'Undo last action' }).click();
-  assert.equal(await cleanPage.locator('.metric').filter({ hasText: 'Evaluation costs' }).locator('strong').innerText(), '$902.00');
+  assert.equal(await cleanPage.locator('.metric').filter({ hasText: 'Evaluation costs' }).locator('strong').innerText(), '$450.00');
   assert.equal(await cleanPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await clean.close();
 
@@ -172,19 +172,19 @@ try {
   assert.equal(await costMetric().innerText(), '$90.20');
   await migratedPage.reload();
   await migratedPage.getByRole('heading', { name: 'No current accounts', exact: true }).waitFor();
-  await migratedPage.getByRole('button', { name: 'Add evaluation for $90.20', exact: true }).click();
+  await migratedPage.getByRole('button', { name: 'Add evaluation for $90.00', exact: true }).click();
   assert.equal((await migratedRead()).version, VERSION);
   assert.equal((await migratedRead()).selectedId, 'eval-2');
-  assert.equal(await costMetric().innerText(), '$180.40');
+  assert.equal(await costMetric().innerText(), '$180.20');
   await migratedPage.reload();
-  assert.equal(await costMetric().innerText(), '$180.40');
+  assert.equal(await costMetric().innerText(), '$180.20');
   await migratedPage.getByRole('button', { name: 'Undo last action' }).click();
   assert.equal((await migratedRead()).selectedId, 'eval-1');
   assert.equal(await costMetric().innerText(), '$90.20');
 
   const migratedNav = label => migratedPage.getByRole('navigation').getByRole('button', { name: new RegExp(`^${label}`) });
   await migratedNav('Settings').click();
-  assert.equal(await migratedPage.getByLabel('Cost per evaluation', { exact: true }).inputValue(), '90.20');
+  assert.equal(await migratedPage.getByLabel('Cost per evaluation', { exact: true }).inputValue(), '90.00');
   await migratedPage.getByLabel('Cost per evaluation', { exact: true }).fill('91.25');
   await migratedPage.getByRole('button', { name: 'Save rules' }).click();
   assert.equal((await migratedRead()).settings.evaluationCostCents, 9125);

@@ -3,18 +3,17 @@ import {
   BarChart3, LayoutDashboard, Layers3, History, SlidersHorizontal,
   Download, Upload, Undo2, Check, X, Wallet, TrendingUp, ChevronRight,
   CircleCheck, CircleDollarSign, ShieldCheck, Clock3, Monitor, Menu,
-  TriangleAlert, ArrowDownToLine, RotateCcw, CalendarDays, Plus, Receipt, GitBranch, Archive,
+  TriangleAlert, ArrowDownToLine, RotateCcw, CalendarDays, Plus, Receipt, GitBranch, Archive, Pencil,
 } from 'lucide-react';
-import { applyAction, createState, evaluationFailureLevel, exportBackup, isArchived, localDate, parseBackup,
+import { accountName as name, applyAction, createState, evaluationFailureLevel, exportBackup, isArchived, localDate, parseBackup,
   qualifyingStartDate, resultTerms, STAGES, STORAGE_KEY, summarize } from './domain.js';
 import { loadState, saveState } from './storage.js';
-import { BackupSummary, Confirmation, HistoryView, SettingsView } from './views.jsx';
+import { BackupSummary, Confirmation, HistoryView, RenameAccount, SettingsView } from './views.jsx';
 
 const money = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 const costMoney = cents => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
 const signed = value => `${value >= 0 ? '+' : '-'}${money(Math.abs(value))}`;
 const rate = value => value === null ? '--' : `${Math.round(value)}%`;
-const name = account => `${account.type === 'funded' ? 'Funded' : 'Evaluation'} ${String(account.number).padStart(2, '0')}`;
 const stageNames = {
   waiting: 'Waiting', evaluation: 'Active Evaluation', passed: 'Evaluation Passed',
   evaluation_failed: 'Evaluation Failed', main: 'Main Profit Phase',
@@ -70,14 +69,15 @@ function ResultControls({ account, onAction, date, setDate, disabled, compact = 
   </div>;
 }
 
-function AccountCard({ account, selected, onSelect, onAction, disabled }) {
+function AccountCard({ account, selected, onSelect, onAction, onRename, disabled }) {
   const [date, setDate] = useState(() => account.openTrade?.date || localDate());
   const archived = isArchived(account);
   const isEval = account.type === 'evaluation';
   const progress = isEval ? Math.max(0, Math.min(100, (account.balance - account.rules.evaluationStart) / (account.rules.evaluationTarget - account.rules.evaluationStart) * 100)) : account.qualifyingDates.length / account.rules.qualifyingWins * 100;
   return <article className={`account-card ${selected ? 'selected' : ''} ${archived ? 'archived' : ''}`} data-account-id={account.id}>
-    {archived ? <div className="account-card-top"><span className="account-mark">{isEval ? <Layers3 size={16} /> : <ShieldCheck size={16} />}</span><span>{name(account)}</span><Archive size={16} aria-label="Archived" /></div>
+    <div className="account-card-header">{archived ? <div className="account-card-top"><span className="account-mark">{isEval ? <Layers3 size={16} /> : <ShieldCheck size={16} />}</span><span>{name(account)}</span><Archive size={16} aria-label="Archived" /></div>
       : <button className="account-card-top" onClick={() => onSelect(account.id)} aria-label={`View ${name(account)}`} aria-pressed={selected}><span className="account-mark">{isEval ? <Layers3 size={16} /> : <ShieldCheck size={16} />}</span><span>{name(account)}</span><ChevronRight size={16} /></button>}
+      <IconButton icon={Pencil} label={`Rename ${name(account)}`} disabled={disabled} onClick={() => onRename(account.id)} /></div>
     <Status stage={account.stage} /><strong>{money(account.balance)}</strong>
     {isEval ? <><div className="mini-track"><div style={{ width: `${progress}%` }} /></div><div className="card-meta"><span>Target {money(account.rules.evaluationTarget)}</span><span>{Math.round(progress)}%</span></div></>
       : <><Checkpoints account={account} compact /><div className="card-meta"><span>Cycle {account.cycle}</span><span>{account.qualifyingDates.length}/{account.rules.qualifyingWins} days</span></div></>}
@@ -88,7 +88,7 @@ function AccountCard({ account, selected, onSelect, onAction, disabled }) {
   </article>;
 }
 
-function CurrentAccount({ account, onAction, date, setDate, disabled }) {
+function CurrentAccount({ account, onAction, onRename, date, setDate, disabled }) {
   const opened = account.openTrade;
   const terms = resultTerms(account);
   const isEval = account.type === 'evaluation';
@@ -96,7 +96,7 @@ function CurrentAccount({ account, onAction, date, setDate, disabled }) {
   const progress = Math.max(0, Math.min(100, (account.balance - r.evaluationStart) / (r.evaluationTarget - r.evaluationStart) * 100));
   return <section className="current-account panel">
     <div className="panel-heading"><div className="eyebrow"><span className="live-mark" />CURRENT ACCOUNT</div>{opened && <span className="open-trade-status"><GitBranch size={15} />Trade open</span>}<Status stage={account.stage} /></div>
-    <div className="current-title"><span className="account-mark large">{isEval ? <Layers3 size={22} /> : <ShieldCheck size={22} />}</span><div><h2>{name(account)}</h2><span>{isEval ? `Evaluation account / Cost ${costMoney(account.purchaseCostCents)}` : `Funded account / Cycle ${account.cycle}`}</span></div></div>
+    <div className="current-title"><span className="account-mark large">{isEval ? <Layers3 size={22} /> : <ShieldCheck size={22} />}</span><div><h2>{name(account)}</h2><span>{isEval ? `Evaluation account / Cost ${costMoney(account.purchaseCostCents)}` : `Funded account / Cycle ${account.cycle}`}</span></div><IconButton icon={Pencil} label={`Rename ${name(account)}`} disabled={disabled} onClick={() => onRename(account.id)} /></div>
     <div className="balance-block"><span className="field-label">Account balance</span><div className="balance">{money(account.balance)}<span>.00</span></div>
       <div className={`balance-change ${account.balance < account.startingBalance ? 'negative' : ''}`}><TrendingUp size={15} />{signed(account.balance - account.startingBalance)} <span>from starting balance</span></div>
     </div>
@@ -132,6 +132,8 @@ export default function App() {
   const [mobileNav, setMobileNav] = useState(false);
   const [accountFilter, setAccountFilter] = useState('all');
   const [confirmation, setConfirmation] = useState(null);
+  const [renamingId, setRenamingId] = useState(null);
+  const renamingAccount = state.accounts.find(item => item.id === renamingId);
   const stats = summarize(state);
   const currentAccounts = state.accounts.filter(item => !isArchived(item));
   const archivedAccounts = state.accounts.filter(isArchived);
@@ -178,6 +180,10 @@ export default function App() {
       const next = applyAction(stateRef.current, action);
       commit(next);
       const latest = next.events.at(-1);
+      if (action.type === 'rename_account') {
+        notify(`Account renamed to ${latest.newName}.`);
+        return null;
+      }
       notify(action.type === 'undo' ? 'Last action undone.' : action.type === 'add_evaluation' ? `Evaluation ${latest.accountNumber} added. ${costMoney(latest.costCents)} cost recorded.` : latest.type === 'evaluation_pass' || latest.type === 'funded_created' ? 'Evaluation passed and archived. Funded account created.' : latest.type === 'evaluation_failure' ? 'Evaluation failed and archived.' : latest.type === 'funded_failure' ? 'Funded account failed and archived.' : latest.type === 'payout_ready' ? 'Qualifying days complete. Payout ready.' : action.type === 'payout' ? 'Payout recorded. Next cycle started.' : action.type === 'settings' ? 'Rules saved.' : `${action.result === 'win' ? 'Win' : 'Loss'} recorded.`);
       return null;
     } catch (error) { notify(error.message); return error.message; }
@@ -217,14 +223,14 @@ export default function App() {
       </div>
     </div>
     {storageError && <div className="error-banner" role="alert"><TriangleAlert size={20} /><p>{storageError}</p><button className="secondary" onClick={() => navigate('settings')}>Open settings</button></div>}
-    {view === 'dashboard' && <><div className="metrics-grid"><Metric label="Evaluations remaining" icon={Layers3} value={stats.remaining}><span><b className="green">{stats.passed}</b> passed</span><span><b className="red">{stats.evalFailed}</b> failed</span></Metric><Metric label="Active funded accounts" icon={ShieldCheck} value={stats.funded}><span><b>{stats.fundedFailed}</b> failed funded accounts</span></Metric><Metric label="Total payouts" icon={Wallet} value={stats.payouts}><span><b className="green">{money(stats.withdrawn)}</b> withdrawn</span></Metric><Metric label="Evaluation costs" icon={Receipt} value={costMoney(stats.costCents)}><span>{stats.evaluationCount} evaluation{stats.evaluationCount !== 1 ? 's' : ''} purchased</span></Metric><Metric label="Total trades" icon={BarChart3} value={stats.trades}><span>Eval <b>{rate(stats.evalRate)}</b></span><span>Funded <b>{rate(stats.fundedRate)}</b></span>{stats.openTrades > 0 && <span><b>{stats.openTrades}</b> open</span>}</Metric></div>{account ? <div className="trading-grid"><CurrentAccount account={account} onAction={act} date={date} setDate={setDate} disabled={!!storageError} /><CyclePanel account={account} stats={stats} /></div> : <div className="empty-state"><Layers3 size={30} /><h2>No current accounts</h2></div>}</>}
+    {view === 'dashboard' && <><div className="metrics-grid"><Metric label="Evaluations remaining" icon={Layers3} value={stats.remaining}><span><b className="green">{stats.passed}</b> passed</span><span><b className="red">{stats.evalFailed}</b> failed</span></Metric><Metric label="Active funded accounts" icon={ShieldCheck} value={stats.funded}><span><b>{stats.fundedFailed}</b> failed funded accounts</span></Metric><Metric label="Total payouts" icon={Wallet} value={stats.payouts}><span><b className="green">{money(stats.withdrawn)}</b> withdrawn</span></Metric><Metric label="Evaluation costs" icon={Receipt} value={costMoney(stats.costCents)}><span>{stats.evaluationCount} evaluation{stats.evaluationCount !== 1 ? 's' : ''} purchased</span></Metric><Metric label="Total trades" icon={BarChart3} value={stats.trades}><span>Eval <b>{rate(stats.evalRate)}</b></span><span>Funded <b>{rate(stats.fundedRate)}</b></span>{stats.openTrades > 0 && <span><b>{stats.openTrades}</b> open</span>}</Metric></div>{account ? <div className="trading-grid"><CurrentAccount account={account} onAction={act} onRename={setRenamingId} date={date} setDate={setDate} disabled={!!storageError} /><CyclePanel account={account} stats={stats} /></div> : <div className="empty-state"><Layers3 size={30} /><h2>No current accounts</h2></div>}</>}
     {(view === 'dashboard' || view === 'accounts') && <section className="account-section">
       <div className="section-heading"><h2>{archivedView ? 'Archived accounts' : 'Account portfolio'} <span>{archivedView ? archivedAccounts.length : currentAccounts.length}</span></h2>{view === 'dashboard' && <button className="text-button" onClick={() => navigate('accounts')}>View all accounts <Layers3 size={15} /></button>}</div>
       {view === 'accounts' && <div className="segmented account-filters" aria-label="Filter accounts">
         {[['all', 'All accounts'], ['evaluation', 'Evaluations'], ['funded', 'Funded']].map(([key, label]) => <button key={key} className={accountFilter === key ? 'selected' : ''} aria-pressed={accountFilter === key} onClick={() => setAccountFilter(key)}>{label}</button>)}
         <button className={archivedView ? 'selected' : ''} aria-pressed={archivedView} onClick={() => setAccountFilter('archived')}><Archive size={14} />Archived <span className="filter-count">{archivedAccounts.length}</span></button>
       </div>}
-      <div className="accounts-grid">{portfolioAccounts.map(item => <AccountCard key={item.id} account={item} selected={!archivedView && item.id === account?.id} onAction={act} disabled={!!storageError} onSelect={id => { select(id); navigate('dashboard'); }} />)}</div>
+      <div className="accounts-grid">{portfolioAccounts.map(item => <AccountCard key={item.id} account={item} selected={!archivedView && item.id === account?.id} onAction={act} onRename={setRenamingId} disabled={!!storageError} onSelect={id => { select(id); navigate('dashboard'); }} />)}</div>
       {view === 'accounts' && !portfolioAccounts.length && <div className="empty-state">{archivedView ? <Archive size={30} /> : <Layers3 size={30} />}<h2>{archivedView ? 'No archived accounts' : accountFilter === 'funded' ? 'No current funded accounts' : accountFilter === 'evaluation' ? 'No current evaluations' : 'No current accounts'}</h2></div>}
     </section>}
     {view === 'dashboard' && <section className="recent-activity"><div className="section-heading"><h2>Recent activity</h2><button className="text-button" onClick={() => navigate('history')}>Full history <History size={15} /></button></div><HistoryView state={state} compact /></section>}
@@ -232,6 +238,11 @@ export default function App() {
     {view === 'settings' && <SettingsView state={state} onSave={settings => act({ type: 'settings', settings })} onExport={() => downloadBackup(state)} onImport={importFile} onReset={() => setConfirmation({ type: 'reset' })} disabled={!!storageError} />}
     <footer><span>Prop Desk</span><span>Local workspace <span className="footer-dot" /> {state.accounts.filter(item => item.type === 'evaluation').length} evaluation accounts</span></footer></main></div>
     {toast && <div className="toast" role="status"><CircleCheck size={19} /><span>{toast}</span><IconButton icon={X} label="Dismiss notification" onClick={() => setToast('')} /></div>}
+    {renamingAccount && <RenameAccount key={renamingId} account={renamingAccount} onClose={() => setRenamingId(null)} disabled={!!storageError} onSave={customName => {
+      const issue = act({ type: 'rename_account', accountId: renamingId, name: customName });
+      if (!issue) setRenamingId(null);
+      return issue;
+    }} />}
     {confirmation && <Confirmation title={confirmation.type === 'import' ? 'Restore backup?' : 'Reset all account data?'} confirmLabel={confirmation.type === 'import' ? 'Restore backup' : 'Reset all data'} danger onConfirm={confirmReplace} onClose={() => setConfirmation(null)}>{confirmation.type === 'import' ? <><p>Replace this workspace with <strong>{confirmation.filename}</strong>. Your current balances, history, and undo state will be replaced.</p><BackupSummary state={confirmation.state} /></> : <p>This will clear all trades, payouts, and history, and create {state.settings.startingEvaluations} evaluations using your saved rules. This cannot be undone.</p>}<button className="secondary" onClick={() => downloadBackup(state)}><Download size={16} />Export current backup</button></Confirmation>}
   </div>;
 }

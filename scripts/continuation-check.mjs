@@ -106,9 +106,9 @@ async function archivedView(page, ids) {
       await expect(tile(page, id).locator('.purchase-cost')).toHaveCount(0);
     } else {
       await expect(tile(page, id).locator('.evaluation-floor strong')).toHaveText(passed ? '$50,000' : '$48,000');
-      await expect(tile(page, id)).toContainText('$90.20');
+      await expect(tile(page, id)).toContainText('$90.00');
     }
-    await expect(tile(page, id).getByRole('button')).toHaveCount(0);
+    await expect(tile(page, id).getByRole('button')).toHaveCount(1);
     await expect(tile(page, id).locator('input')).toHaveCount(0);
   }
 }
@@ -190,7 +190,7 @@ try {
   assert.equal(account(current, 'funded-6').stage, 'main');
   assert.equal(account(current, 'eval-5').evaluationRole, 'primary');
   assert.equal(account(current, 'eval-6').evaluationHighWater, 53000);
-  assert.equal(account(current, 'eval-6').purchaseCostCents, 9020);
+  assert.equal(account(current, 'eval-6').purchaseCostCents, 9000);
   await expect(tile(page, 'eval-6')).toHaveCount(0);
   await expect(button(page, 'funded-6', 'win')).toBeEnabled();
   await archivedView(page, passedArchived);

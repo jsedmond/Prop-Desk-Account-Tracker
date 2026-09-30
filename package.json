@@ -12,7 +12,8 @@
     "test:continuation": "node scripts/continuation-check.mjs",
     "test:trailing": "node scripts/trailing-check.mjs",
     "test:qualifying-date": "node scripts/qualifying-date-check.mjs",
-    "test:pages": "node scripts/pages-check.mjs"
+    "test:pages": "node scripts/pages-check.mjs",
+    "test:account-names": "node scripts/account-names-check.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

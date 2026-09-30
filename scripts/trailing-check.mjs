@@ -68,9 +68,9 @@ async function archivedView(page) {
   await expect(tile(page, 'eval-1')).toContainText('Evaluation Passed');
   await expect(tile(page, 'eval-1')).toContainText('$53,000');
   await expect(tile(page, 'eval-1').locator('.evaluation-floor strong')).toHaveText('$50,000');
-  await expect(tile(page, 'eval-1').getByRole('button')).toHaveCount(0);
+  await expect(tile(page, 'eval-1').getByRole('button')).toHaveCount(1);
   await expect(tile(page)).toBeVisible();
-  await expect(tile(page).getByRole('button')).toHaveCount(0);
+  await expect(tile(page).getByRole('button')).toHaveCount(1);
   await expect(tile(page).locator('.evaluation-floor strong')).toHaveText('$50,000');
 }
 
