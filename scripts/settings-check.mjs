@@ -24,6 +24,7 @@ try {
     const navigate = async label => {
       if (width === 320) await page.getByRole('button', { name: 'Toggle navigation' }).click();
       await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: label, exact: true }).click();
+      if (width === 320) await page.waitForFunction(() => document.querySelector('.sidebar').getBoundingClientRect().right <= 0);
     };
     const currentWin = () => page.locator('.current-account').getByRole('button', { name: /^WIN/ });
     const tileWin = id => page.locator(`.account-card[data-account-id="${id}"]`).getByRole('button', { name: /^WIN/ });
